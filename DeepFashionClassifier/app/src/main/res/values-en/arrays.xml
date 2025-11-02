@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="pref_result_density_entries">
+        <item>Compact</item>
+        <item>Standard</item>
+        <item>Detailed</item>
+    </string-array>
+    <string-array name="pref_result_density_values">
+        <item>compact</item>
+        <item>standard</item>
+        <item>detailed</item>
+    </string-array>
+
+    <string-array name="pref_default_camera_entries">
+        <item>Rear Camera</item>
+        <item>Front Camera</item>
+    </string-array>
+    <string-array name="pref_default_camera_values">
+        <item>back</item>
+        <item>front</item>
+    </string-array>
+</resources>
+
+

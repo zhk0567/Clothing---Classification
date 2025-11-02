@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">服饰识别</string>
+    <string name="settings">设置</string>
+    <string name="open_settings">打开设置</string>
+    <string name="pref_title_general">通用设置</string>
+    <string name="pref_language">界面语言</string>
+    <string name="pref_performance">性能优先（多线程）</string>
+    <string name="pref_performance_summary">开启后推理会使用更多CPU线程以提升速度（可能更耗电/更热）。设置会立即生效。</string>
+    <string name="pref_model">模型</string>
+    <string name="pref_theme">主题</string>
+    <string name="pref_theme_system">跟随系统</string>
+    <string name="about">关于</string>
+    <string name="about_category">应用信息</string>
+    <string name="about_summary">版本 v1.0\n\n应用名：服饰识别\n\n核心特性：\n- 50 类服饰识别、离线 ONNX 推理、Material 3 现代化界面\n- 设置即时生效：语言切换（中文/English）、性能优先（多线程）、主题模式（跟随系统/浅色/深色）、结果展示密度、默认摄像头选择\n- 相机功能：前后摄切换、从相册选择图片、手势对焦（双指缩放、双击对焦）\n- 历史记录：结果保存、收藏功能、筛选（类别/置信度/时间）、搜索、分享（文字/图片）\n- 其他：保存图片到相册、页面切换动画、历史记录管理\n\n训练与模型：\n- PyTorch 训练 → 导出 ONNX，应用内使用 ONNX Runtime 推理\n\n模型性能（训练中）：\n- Epoch: 27/100\n- 训练准确率: 79.11%\n- 验证准确率: 60.90%</string>
+    <string name="back">返回</string>
+    <string name="pref_result_density">结果展示密度</string>
+    <string name="pref_result_density_summary">控制结果页面的信息展示详细程度</string>
+    <string name="pref_default_camera">默认摄像头</string>
+    <string name="pref_default_camera_summary">应用启动时默认使用的摄像头</string>
+    <string name="share">分享</string>
+    <string name="history">历史</string>
+    <string name="select_from_gallery">从相册选择</string>
+    <string name="switch_camera">切换摄像头</string>
+    <string name="share_text">分享文字</string>
+    <string name="share_image">分享图片</string>
+    <string name="select_share_method">选择分享方式</string>
+    <string name="search_hint">搜索类别、时间...</string>
+    <string name="filter_by_category">按类别筛选</string>
+    <string name="filter_by_confidence">按置信度筛选</string>
+    <string name="filter_by_time">按时间筛选</string>
+    <string name="filter_clear">清除筛选</string>
+    <string name="filter_confidence_min">最低置信度：%1$d%%</string>
+    <string name="filter_time_today">今天</string>
+    <string name="filter_time_week">最近一周</string>
+    <string name="filter_time_month">最近一月</string>
+    <string name="filter_time_all">全部时间</string>
+    <string name="no_results">没有找到匹配的记录</string>
+    <string name="save_image">保存图片</string>
+    <string name="save_image_success">图片已保存到相册</string>
+    <string name="save_image_failed">保存图片失败</string>
+    <string name="save_image_no_image">没有可保存的图片</string>
+    <string name="favorite">收藏</string>
+    <string name="favorite_added">已添加到收藏</string>
+    <string name="favorite_removed">已取消收藏</string>
+    <string name="filter_favorites_only">仅显示收藏</string>
+</resources>

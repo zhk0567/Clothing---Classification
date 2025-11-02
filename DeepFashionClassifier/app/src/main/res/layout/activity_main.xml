@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="0dp"
+    android:gravity="center"
+    android:background="@drawable/bg_main_gradient">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="20dp"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="6dp"
+        app:cardBackgroundColor="?attr/colorSurface"
+        app:strokeWidth="0dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:src="@drawable/ic_launcher_foreground"
+                    android:contentDescription="logo" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:paddingStart="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/app_name"
+                        android:textStyle="bold"
+                        android:textSize="22sp"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="准确、快速、离线运行"
+                        android:textSize="14sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <ImageButton
+                    android:id="@+id/btnSettings"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="@string/settings"
+                    android:hapticFeedbackEnabled="false"
+                    android:src="@android:drawable/ic_menu_preferences" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="将镜头对准衣物，点击下方开始即可识别类别，支持50类"
+                android:textSize="14sp"
+                android:layout_marginTop="14dp"
+                android:textColor="?attr/colorOnSurface" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="18dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnStartCamera"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="开始识别"
+                    style="@style/Widget.Material3.Button"
+                    android:hapticFeedbackEnabled="false"
+                    android:textSize="16sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSelectFromGallery"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="@string/select_from_gallery"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_marginTop="10dp"
+                    android:hapticFeedbackEnabled="false"
+                    android:textSize="16sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnViewResults"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="查看历史"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_marginTop="10dp"
+                    android:hapticFeedbackEnabled="false"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</LinearLayout>

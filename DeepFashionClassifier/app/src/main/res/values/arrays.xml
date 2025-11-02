@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="pref_language_entries">
+        <item>中文</item>
+        <item>English</item>
+    </string-array>
+    <string-array name="pref_language_values">
+        <item>zh</item>
+        <item>en</item>
+    </string-array>
+
+    <string-array name="pref_theme_entries">
+        <item>跟随系统</item>
+        <item>浅色</item>
+        <item>深色</item>
+    </string-array>
+    <string-array name="pref_theme_values">
+        <item>system</item>
+        <item>light</item>
+        <item>dark</item>
+    </string-array>
+
+    <string-array name="pref_result_density_entries">
+        <item>精简</item>
+        <item>标准</item>
+        <item>详细</item>
+    </string-array>
+    <string-array name="pref_result_density_values">
+        <item>compact</item>
+        <item>standard</item>
+        <item>detailed</item>
+    </string-array>
+
+    <string-array name="pref_default_camera_entries">
+        <item>后置摄像头</item>
+        <item>前置摄像头</item>
+    </string-array>
+    <string-array name="pref_default_camera_values">
+        <item>back</item>
+        <item>front</item>
+    </string-array>
+</resources>
+
+

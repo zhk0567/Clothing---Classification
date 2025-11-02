@@ -1,0 +1,66 @@
+# APK 文件
+*.apk
+
+# Android 构建目录
+**/build/
+**/app/build/
+**/app/.cxx/
+**/.gradle/
+**/local.properties
+
+# Android Studio
+**/.idea/
+**/*.iml
+**/.local_history/
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/env/
+**/venv/
+**/ENV/
+**/.pytest_cache/
+
+# 大型数据集目录（包含大量图片，体积过大）
+Category and Attribute Prediction Benchmark/
+
+# 模型文件（体积较大，不推送）
+*.pth
+*.onnx
+
+# 备份目录
+models_backup/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+*.swp
+*.bak
+
+# Gradle
+**/gradle-*.zip
+.gradle/
+build/
+
+# Kotlin
+*.kt.swp
+
+# 其他
+*.log
+*.cache
+

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Clothing Classifier</string>
+    <string name="settings">Settings</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="pref_title_general">General</string>
+    <string name="pref_language">Language</string>
+    <string name="pref_performance">Performance Priority (Multi-thread)</string>
+    <string name="pref_performance_summary">Use more CPU threads for faster inference (may increase power/heat). Takes effect immediately.</string>
+    <string name="pref_model">Model</string>
+    <string name="pref_theme">Theme</string>
+    <string name="pref_theme_system">Follow system</string>
+    <string name="about">About</string>
+    <string name="about_category">App Info</string>
+    <string name="about_summary">Version v1.0\n\nApp name: Clothing Classifier\n\nCore Features:\n- 50-category clothing recognition, offline ONNX inference, Material 3 modern UI\n- Settings take effect immediately: Language switch (Chinese/English), Performance priority (multi-thread), Theme mode (Follow system/Light/Dark), Result display density, Default camera selection\n- Camera features: Front/rear camera switch, Select images from gallery, Gesture focus (pinch zoom, double-tap focus)\n- History: Save results, Favorite function, Filter (category/confidence/time), Search, Share (text/image)\n- Others: Save images to gallery, Page transition animations, History management\n\nTraining &amp; Model:\n- PyTorch training → export ONNX, use ONNX Runtime inference in app\n\nModel Performance (Training):\n- Epoch: 27/100\n- Training Accuracy: 79.11%\n- Validation Accuracy: 60.90%</string>
+    <string name="back">Back</string>
+    <string name="pref_result_density">Result Display Density</string>
+    <string name="pref_result_density_summary">Control the detail level of information displayed on the result page</string>
+    <string name="pref_default_camera">Default Camera</string>
+    <string name="pref_default_camera_summary">Default camera to use when the app starts</string>
+    <string name="share">Share</string>
+    <string name="history">History</string>
+    <string name="select_from_gallery">Select from Gallery</string>
+    <string name="switch_camera">Switch Camera</string>
+    <string name="share_text">Share Text</string>
+    <string name="share_image">Share Image</string>
+    <string name="select_share_method">Select Share Method</string>
+    <string name="search_hint">Search category, time...</string>
+    <string name="filter_by_category">Filter by Category</string>
+    <string name="filter_by_confidence">Filter by Confidence</string>
+    <string name="filter_by_time">Filter by Time</string>
+    <string name="filter_clear">Clear Filters</string>
+    <string name="filter_confidence_min">Min Confidence: %1$d%%</string>
+    <string name="filter_time_today">Today</string>
+    <string name="filter_time_week">Last Week</string>
+    <string name="filter_time_month">Last Month</string>
+    <string name="filter_time_all">All Time</string>
+    <string name="no_results">No matching records found</string>
+    <string name="save_image">Save Image</string>
+    <string name="save_image_success">Image saved to gallery</string>
+    <string name="save_image_failed">Failed to save image</string>
+    <string name="save_image_no_image">No image to save</string>
+    <string name="favorite">Favorite</string>
+    <string name="favorite_added">Added to favorites</string>
+    <string name="favorite_removed">Removed from favorites</string>
+    <string name="filter_favorites_only">Favorites Only</string>
+</resources>
+
+
