@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_favorite"
+        android:title="@string/favorite"
+        android:icon="@drawable/ic_favorite_outline"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_share"
+        android:title="@string/share"
+        android:icon="@android:drawable/ic_menu_share"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_crop"
+        android:title="@string/crop_reclassify"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_enhance"
+        android:title="@string/enhance_reclassify"
+        app:showAsAction="never" />
+</menu>
+

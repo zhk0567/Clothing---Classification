@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="pref_result_density_entries">
+        <item>Compact</item>
+        <item>Standard</item>
+        <item>Detailed</item>
+    </string-array>
+    <string-array name="pref_result_density_values">
+        <item>compact</item>
+        <item>standard</item>
+        <item>detailed</item>
+    </string-array>
+
+    <string-array name="pref_default_camera_entries">
+        <item>Rear Camera</item>
+        <item>Front Camera</item>
+    </string-array>
+    <string-array name="pref_default_camera_values">
+        <item>back</item>
+        <item>front</item>
+    </string-array>
+
+    <string-array name="changelog_entries">
+        <item>v1.2 — Burst mode, resolution, share watermark, compare long image, crash logs</item>
+        <item>v1.2 — Classifier singleton/cache, ZIP backup restore, armeabi-v7a, UI smoke tests</item>
+        <item>v1.1 — Bottom nav, 50-category guide, batch classify, Top-3, crop/enhance reclassify</item>
+        <item>v1.1 — Statistics, favorites, compare, export, history multi-select</item>
+        <item>v1.0 — 50-category offline recognition, camera/gallery, history, Material 3 settings</item>
+    </string-array>
+
+    <string-array name="pref_camera_resolution_entries">
+        <item>High (1920×1080)</item>
+        <item>Medium (1280×720)</item>
+        <item>Low (640×480)</item>
+    </string-array>
+    <string-array name="pref_camera_resolution_values">
+        <item>high</item>
+        <item>medium</item>
+        <item>low</item>
+    </string-array>
+
+    <string-array name="pref_burst_count_entries">
+        <item>3 photos</item>
+        <item>5 photos</item>
+        <item>8 photos</item>
+    </string-array>
+    <string-array name="pref_burst_count_values">
+        <item>3</item>
+        <item>5</item>
+        <item>8</item>
+    </string-array>
+
+    <string-array name="pref_burst_strategy_entries">
+        <item>Keep highest confidence</item>
+        <item>Save all to batch results</item>
+    </string-array>
+    <string-array name="pref_burst_strategy_values">
+        <item>best</item>
+        <item>all</item>
+    </string-array>
+</resources>
+
+

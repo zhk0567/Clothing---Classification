@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="pref_language_entries">
+        <item>中文</item>
+        <item>English</item>
+    </string-array>
+    <string-array name="pref_language_values">
+        <item>zh</item>
+        <item>en</item>
+    </string-array>
+
+    <string-array name="pref_theme_entries">
+        <item>跟随系统</item>
+        <item>浅色</item>
+        <item>深色</item>
+    </string-array>
+    <string-array name="pref_theme_values">
+        <item>system</item>
+        <item>light</item>
+        <item>dark</item>
+    </string-array>
+
+    <string-array name="pref_result_density_entries">
+        <item>精简</item>
+        <item>标准</item>
+        <item>详细</item>
+    </string-array>
+    <string-array name="pref_result_density_values">
+        <item>compact</item>
+        <item>standard</item>
+        <item>detailed</item>
+    </string-array>
+
+    <string-array name="pref_default_camera_entries">
+        <item>后置摄像头</item>
+        <item>前置摄像头</item>
+    </string-array>
+    <string-array name="pref_default_camera_values">
+        <item>back</item>
+        <item>front</item>
+    </string-array>
+
+    <string-array name="changelog_entries">
+        <item>v1.2 — 连拍模式、拍摄分辨率、分享水印、对比长图、崩溃日志</item>
+        <item>v1.2 — 推理单例与缓存、ZIP 备份恢复、armeabi-v7a、UI 冒烟测试</item>
+        <item>v1.1 — 底部导航、50类百科、批量识别、Top-3结果、裁剪/增强重识别</item>
+        <item>v1.1 — 数据统计、收藏夹、对比、导出、历史多选批量操作</item>
+        <item>v1.0 — 50类离线识别、相机/相册、历史记录、Material 3 设置</item>
+    </string-array>
+
+    <string-array name="pref_camera_resolution_entries">
+        <item>高 (1920×1080)</item>
+        <item>中 (1280×720)</item>
+        <item>低 (640×480)</item>
+    </string-array>
+    <string-array name="pref_camera_resolution_values">
+        <item>high</item>
+        <item>medium</item>
+        <item>low</item>
+    </string-array>
+
+    <string-array name="pref_burst_count_entries">
+        <item>3 张</item>
+        <item>5 张</item>
+        <item>8 张</item>
+    </string-array>
+    <string-array name="pref_burst_count_values">
+        <item>3</item>
+        <item>5</item>
+        <item>8</item>
+    </string-array>
+
+    <string-array name="pref_burst_strategy_entries">
+        <item>保留最高置信度</item>
+        <item>全部保存到批量结果</item>
+    </string-array>
+    <string-array name="pref_burst_strategy_values">
+        <item>best</item>
+        <item>all</item>
+    </string-array>
+</resources>
+
+

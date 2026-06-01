@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="@string/pref_title_general"
+        app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="pref_performance_threads"
+            android:title="@string/pref_performance"
+            android:summary="@string/pref_performance_summary"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="pref_language"
+            android:title="@string/pref_language"
+            android:entries="@array/pref_language_entries"
+            android:entryValues="@array/pref_language_values"
+            android:defaultValue="zh"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+
+        <ListPreference
+            android:key="pref_theme_mode"
+            android:title="@string/pref_theme"
+            android:entries="@array/pref_theme_entries"
+            android:entryValues="@array/pref_theme_values"
+            android:defaultValue="system"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="pref_result_density"
+            android:title="@string/pref_result_density"
+            android:summary="@string/pref_result_density_summary"
+            android:entries="@array/pref_result_density_entries"
+            android:entryValues="@array/pref_result_density_values"
+            android:defaultValue="standard"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_camera_grid"
+            android:title="@string/pref_camera_grid"
+            android:summary="@string/pref_camera_grid_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_shutter_sound"
+            android:title="@string/pref_shutter_sound"
+            android:summary="@string/pref_shutter_sound_summary"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="pref_default_camera"
+            android:title="@string/pref_default_camera"
+            android:summary="@string/pref_default_camera_summary"
+            android:entries="@array/pref_default_camera_entries"
+            android:entryValues="@array/pref_default_camera_values"
+            android:defaultValue="back"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="pref_camera_resolution"
+            android:title="@string/pref_camera_resolution"
+            android:summary="@string/pref_camera_resolution_summary"
+            android:entries="@array/pref_camera_resolution_entries"
+            android:entryValues="@array/pref_camera_resolution_values"
+            android:defaultValue="high"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="pref_burst_count"
+            android:title="@string/pref_burst_count"
+            android:summary="@string/pref_burst_count_summary"
+            android:entries="@array/pref_burst_count_entries"
+            android:entryValues="@array/pref_burst_count_values"
+            android:defaultValue="5"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="pref_burst_strategy"
+            android:title="@string/pref_burst_strategy"
+            android:summary="@string/pref_burst_strategy_summary"
+            android:entries="@array/pref_burst_strategy_entries"
+            android:entryValues="@array/pref_burst_strategy_values"
+            android:defaultValue="best"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_share_watermark"
+            android:title="@string/pref_share_watermark"
+            android:summary="@string/pref_share_watermark_summary"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/about_category"
+        app:iconSpaceReserved="false">
+        <Preference
+            android:key="pref_about"
+            android:title="@string/about"
+            android:summary="@string/about_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+</PreferenceScreen>
+
