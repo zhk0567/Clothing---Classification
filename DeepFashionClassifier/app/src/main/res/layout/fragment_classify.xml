@@ -1,57 +1,102 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_main_gradient"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:padding="20dp">
+    android:clipToPadding="false"
+    android:fillViewport="true">
 
-    <com.google.android.material.card.MaterialCardView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="20dp"
-        app:cardElevation="6dp">
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:padding="@dimen/home_padding">
 
+        <!-- Header -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="20dp">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="@string/nav_classify"
+                android:src="@android:drawable/ic_menu_camera"
+                app:tint="@color/home_accent" />
+
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="@string/classify_title"
-                android:textSize="20sp"
-                android:textStyle="bold" />
+                android:layout_marginStart="14dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnStartCamera"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="16dp"
-                android:contentDescription="@string/start_recognition"
-                android:text="@string/start_recognition" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/classify_title"
+                    android:textAppearance="@style/TextAppearance.Home.Display" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnSelectFromGallery"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="10dp"
-                android:contentDescription="@string/select_from_gallery"
-                android:text="@string/select_from_gallery" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnBatchClassify"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="10dp"
-                android:contentDescription="@string/batch_classify"
-                android:text="@string/batch_classify" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/classify_subtitle"
+                    android:textAppearance="@style/TextAppearance.Home.Caption" />
+            </LinearLayout>
         </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-</LinearLayout>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.Home.Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/home_section_gap">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnStartCamera"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/home_button_height"
+                    android:contentDescription="@string/start_recognition"
+                    android:text="@string/start_recognition"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_menu_camera"
+                    app:iconGravity="textStart" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSelectFromGallery"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/home_button_height"
+                    android:layout_marginTop="@dimen/home_item_gap"
+                    android:contentDescription="@string/select_from_gallery"
+                    android:text="@string/select_from_gallery"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_menu_gallery"
+                    app:iconGravity="textStart"
+                    app:strokeColor="@color/home_accent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBatchClassify"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/home_button_height"
+                    android:layout_marginTop="@dimen/home_item_gap"
+                    android:contentDescription="@string/batch_classify"
+                    android:text="@string/batch_classify"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_menu_upload"
+                    app:iconGravity="textStart" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+</ScrollView>

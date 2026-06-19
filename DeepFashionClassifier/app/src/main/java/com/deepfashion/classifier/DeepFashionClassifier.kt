@@ -12,6 +12,8 @@ import java.nio.ByteOrder
 class DeepFashionClassifier(private val context: Context) {
 
     private var ortSession: OrtSession? = null
+    /** 与训练脚本 val_transform 一致：Resize(256) + CenterCrop(224) */
+    private val resizeSide = 256
     private val inputSize = 224
     private val numClasses = 50
     private var lastPerfThreadsEnabled: Boolean? = null
@@ -71,8 +73,11 @@ class DeepFashionClassifier(private val context: Context) {
         var inputTensor: OnnxTensor? = null
         var outputTensor: OnnxTensor? = null
         try {
-            val resizedBitmap = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
-            val inputArray = bitmapToFloatArray(resizedBitmap)
+            val preprocessed = preprocessForInference(bitmap)
+            val inputArray = bitmapToFloatArray(preprocessed)
+            if (preprocessed !== bitmap) {
+                preprocessed.recycle()
+            }
             val inputBuffer = ByteBuffer.allocateDirect(inputArray.size * 4)
                 .order(ByteOrder.nativeOrder()).asFloatBuffer()
             inputBuffer.put(inputArray)
@@ -121,6 +126,24 @@ class DeepFashionClassifier(private val context: Context) {
             Log.e("DeepFashionClassifier", "分类失败", e)
             throw RuntimeException("分类失败", e)
         }
+    }
+
+    /**
+     * 对齐 PyTorch：Resize(256,256) 后 CenterCrop(224)。
+     * 不可直接拉伸到 224×224，否则会产生 Training-Serving Skew。
+     */
+    private fun preprocessForInference(source: Bitmap): Bitmap {
+        val scaled = if (source.width == resizeSide && source.height == resizeSide) {
+            source
+        } else {
+            Bitmap.createScaledBitmap(source, resizeSide, resizeSide, true)
+        }
+        val offset = (resizeSide - inputSize) / 2
+        val cropped = Bitmap.createBitmap(scaled, offset, offset, inputSize, inputSize)
+        if (scaled !== source && scaled !== cropped) {
+            scaled.recycle()
+        }
+        return cropped
     }
 
     private fun bitmapToFloatArray(bitmap: Bitmap): FloatArray {

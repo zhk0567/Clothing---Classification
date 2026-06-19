@@ -7,13 +7,107 @@
     android:focusable="true"
     android:focusableInTouchMode="true">
 
+    <!-- 多选顶栏：置于顶部，避免被底部导航遮挡 -->
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/multiSelectBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="4dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="?attr/colorPrimaryContainer"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="2dp"
+        app:strokeColor="?attr/colorOutlineVariant"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="10dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMultiCancel"
+                    style="@style/Widget.Material3.Button.IconButton"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:contentDescription="@string/cancel_multi_select"
+                    app:icon="@drawable/ic_close"
+                    app:iconTint="?attr/colorOnPrimaryContainer" />
+
+                <TextView
+                    android:id="@+id/tvSelectedCount"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                    android:textColor="?attr/colorOnPrimaryContainer" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMultiSelectAll"
+                    style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:contentDescription="@string/select_all"
+                    app:icon="@drawable/ic_select_all"
+                    app:iconTint="?attr/colorOnSecondaryContainer" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMultiExport"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/batch_export"
+                    android:textSize="14sp"
+                    app:cornerRadius="10dp"
+                    app:icon="@android:drawable/ic_menu_share"
+                    app:iconGravity="textStart"
+                    app:iconSize="18dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMultiDelete"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/batch_delete"
+                    android:textSize="14sp"
+                    app:cornerRadius="10dp"
+                    app:icon="@android:drawable/ic_menu_delete"
+                    app:iconGravity="textStart"
+                    app:iconSize="18dp" />
+            </LinearLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/filterCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="8dp"
+        app:cardBackgroundColor="?attr/colorSurface"
         app:cardCornerRadius="12dp"
-        app:cardElevation="2dp"
-        app:cardBackgroundColor="?attr/colorSurface">
+        app:cardElevation="2dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -22,17 +116,17 @@
             android:padding="12dp">
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/search_hint"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="@string/search_hint">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/editSearch"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="text"
                     android:imeOptions="actionSearch"
+                    android:inputType="text"
                     android:maxLines="1" />
 
             </com.google.android.material.textfield.TextInputLayout>
@@ -40,39 +134,39 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
                 android:layout_marginTop="8dp"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnFilterCategory"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
                     android:layout_weight="1"
                     android:text="@string/filter_by_category"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_marginEnd="4dp"
                     android:textSize="12sp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnFilterConfidence"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/filter_by_confidence"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_marginStart="4dp"
                     android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/filter_by_confidence"
                     android:textSize="12sp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnFilterTime"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
                     android:layout_weight="1"
                     android:text="@string/filter_by_time"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_marginStart="4dp"
                     android:textSize="12sp" />
 
             </LinearLayout>
@@ -82,8 +176,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                app:singleSelection="false"
-                app:selectionRequired="false" />
+                app:selectionRequired="false"
+                app:singleSelection="false" />
 
         </LinearLayout>
 
@@ -94,10 +188,11 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:clipToPadding="false"
         android:divider="@drawable/list_divider"
         android:dividerHeight="1dp"
-        android:padding="8dp" />
+        android:padding="8dp"
+        android:paddingBottom="8dp"
+        android:scrollbarStyle="outsideOverlay" />
 
 </LinearLayout>
-
-

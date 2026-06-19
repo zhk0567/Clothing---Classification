@@ -29,11 +29,6 @@ class CategoryDetailActivity : AppCompatActivity() {
         binding.tvHistoryCount.text = getString(R.string.category_history_count, count)
         binding.tvDescription.text = CategoryRepository.getDescription(categoryEn, isZh)
 
-        binding.btnStartRecognize.setOnClickListener {
-            startActivity(Intent(this, CameraActivity::class.java))
-            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
-        }
-
         binding.btnViewCategoryHistory.setOnClickListener {
             val intent = Intent(this, MainContainerActivity::class.java)
             intent.putExtra(MainContainerActivity.EXTRA_TAB, MainContainerActivity.TAB_HISTORY)

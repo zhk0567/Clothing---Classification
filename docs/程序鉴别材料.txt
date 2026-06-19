@@ -1,0 +1,2990 @@
+// ===== DeepFashionApp.kt =====
+package com.deepfashion.classifier
+import android.app.Application
+class DeepFashionApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        CrashHandler.install(this)
+        // 移除已废弃的实时检测相关偏好项
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(this).edit()
+            .remove("pref_realtime_detection")
+            .remove("pref_detection_interval")
+            .apply()
+        Thread {
+            DemoDataSeeder.seedIfEmpty(applicationContext)
+        }.start()
+    }
+}
+// ===== MainContainerActivity.kt =====
+package com.deepfashion.classifier
+import android.content.Intent
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.Fragment
+import androidx.preference.PreferenceManager
+import com.deepfashion.classifier.databinding.ActivityMainContainerBinding
+class MainContainerActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityMainContainerBinding
+    private var currentFragmentTag: String = TAG_HOME
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityMainContainerBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        if (savedInstanceState == null) {
+            val initialTab = intent.getStringExtra(EXTRA_TAB)
+            val categoryFilter = intent.getStringExtra(EXTRA_CATEGORY_FILTER)
+            when (initialTab) {
+                TAB_HISTORY -> {
+                    showFragment(HistoryFragment.newInstance(categoryFilter), TAG_HISTORY)
+                    binding.bottomNavigation.selectedItemId = R.id.nav_history
+                }
+                else -> showFragment(HomeFragment(), TAG_HOME)
+            }
+        } else {
+            currentFragmentTag = savedInstanceState.getString(STATE_FRAGMENT, TAG_HOME)
+        }
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> showFragment(HomeFragment(), TAG_HOME)
+                R.id.nav_classify -> showFragment(ClassifyFragment(), TAG_CLASSIFY)
+                R.id.nav_categories -> showFragment(CategoryListFragment(), TAG_CATEGORIES)
+                R.id.nav_history -> showFragment(HistoryFragment.newInstance(), TAG_HISTORY)
+                R.id.nav_more -> showFragment(MoreFragment(), TAG_MORE)
+                else -> false
+            }
+        }
+        checkOnboarding()
+    }
+    private fun checkOnboarding() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        if (!prefs.getBoolean(PREF_ONBOARDING_DONE, false)) {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+        }
+    }
+    private fun showFragment(fragment: Fragment, tag: String): Boolean {
+        if (currentFragmentTag == tag && supportFragmentManager.findFragmentByTag(tag) != null) {
+            return true
+        }
+        currentFragmentTag = tag
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.nav_host_fragment, fragment, tag)
+            .commit()
+        return true
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_FRAGMENT, currentFragmentTag)
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+    companion object {
+        const val PREF_ONBOARDING_DONE = "pref_onboarding_done"
+        const val EXTRA_TAB = "extra_tab"
+        const val EXTRA_CATEGORY_FILTER = "extra_category_filter"
+        const val TAB_HISTORY = "history"
+        private const val STATE_FRAGMENT = "state_fragment"
+        private const val TAG_HOME = "home"
+        private const val TAG_CLASSIFY = "classify"
+        private const val TAG_CATEGORIES = "categories"
+        private const val TAG_HISTORY = "history"
+        private const val TAG_MORE = "more"
+    }
+}
+// ===== DeepFashionClassifier.kt =====
+package com.deepfashion.classifier
+import android.content.Context
+import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.util.Log
+import ai.onnxruntime.*
+import androidx.preference.PreferenceManager
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+class DeepFashionClassifier(private val context: Context) {
+    private var ortSession: OrtSession? = null
+    private val inputSize = 224
+    private val numClasses = 50
+    private var lastPerfThreadsEnabled: Boolean? = null
+    private val categories = CategoryRepository.englishNames
+    init {
+        loadModel()
+    }
+    private fun loadModel() {
+        try {
+            val ortEnv = OrtEnvironment.getEnvironment()
+            val modelBytes = context.assets.open("models/deepfashion_classifier.onnx").readBytes()
+            val sessionOptions = OrtSession.SessionOptions()
+            val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
+            val perfThreads = prefs.getBoolean("pref_performance_threads", true)
+            if (perfThreads) {
+                val threads = computeThreadCount()
+                try { sessionOptions.setIntraOpNumThreads(threads) } catch (_: Throwable) { }
+                try { sessionOptions.setInterOpNumThreads(threads) } catch (_: Throwable) { }
+            } else {
+                try { sessionOptions.setIntraOpNumThreads(1) } catch (_: Throwable) { }
+                try { sessionOptions.setInterOpNumThreads(1) } catch (_: Throwable) { }
+            }
+            ortSession = ortEnv.createSession(modelBytes, sessionOptions)
+            lastPerfThreadsEnabled = perfThreads
+        } catch (e: Exception) {
+            Log.e("DeepFashionClassifier", "模型加载失败", e)
+            throw RuntimeException("无法加载DeepFashion模型", e)
+        }
+    }
+    private fun ensureSessionUpToDate() {
+        val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
+        val perfThreads = prefs.getBoolean("pref_performance_threads", true)
+        val needReload = (lastPerfThreadsEnabled == null) || (lastPerfThreadsEnabled != perfThreads) || (ortSession == null)
+        if (needReload) {
+            try { ortSession?.close() } catch (_: Exception) { }
+            ortSession = null
+            loadModel()
+        }
+    }
+    private fun isZh(): Boolean {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+        return (prefs.getString("pref_language", "zh") ?: "zh") == "zh"
+    }
+    fun classifyImage(bitmap: Bitmap): ClassificationResult {
+        return classifyImageTopK(bitmap, 1).first()
+    }
+    fun classifyImageTopK(bitmap: Bitmap, k: Int = 3): List<ClassificationResult> {
+        ensureSessionUpToDate()
+        val session = ortSession ?: throw RuntimeException("模型未加载")
+        var inputTensor: OnnxTensor? = null
+        var outputTensor: OnnxTensor? = null
+        try {
+            val resizedBitmap = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
+            val inputArray = bitmapToFloatArray(resizedBitmap)
+            val inputBuffer = ByteBuffer.allocateDirect(inputArray.size * 4)
+                .order(ByteOrder.nativeOrder()).asFloatBuffer()
+            inputBuffer.put(inputArray)
+            inputBuffer.rewind()
+            val ortEnv = OrtEnvironment.getEnvironment()
+            val inputName = session.inputNames.iterator().next()
+            inputTensor = OnnxTensor.createTensor(ortEnv, inputBuffer, longArrayOf(1, 3, 224, 224))
+            val inputs = mutableMapOf<String, OnnxTensorLike>()
+            inputs[inputName] = inputTensor
+            val outputs = session.run(inputs)
+            val outputName = session.outputNames.iterator().next()
+            val firstOutput: OnnxValue = try {
+                outputs.get(outputName).orElse(outputs.get(0))
+            } catch (_: Exception) {
+                outputs.get(0)
+            }
+            outputTensor = (firstOutput as? OnnxTensor) ?: throw RuntimeException("输出格式错误")
+            val outputBuffer = outputTensor.floatBuffer
+            outputBuffer.rewind()
+            val probabilities = FloatArray(numClasses)
+            outputBuffer.get(probabilities)
+            outputs.close()
+            inputTensor.close()
+            outputTensor.close()
+            inputTensor = null
+            outputTensor = null
+            val probs = softmax(probabilities)
+            val topIndices = probs.indices.sortedByDescending { probs[it] }.take(k.coerceAtMost(numClasses))
+            val isZh = isZh()
+            return topIndices.map { idx ->
+                val categoryEn = if (idx < categories.size) categories[idx] else "Unknown"
+                val category = CategoryRepository.getDisplayName(categoryEn, isZh)
+                ClassificationResult(
+                    category = category,
+                    confidence = probs[idx],
+                    description = CategoryRepository.getDescription(categoryEn, isZh),
+                    categoryEn = categoryEn
+                )
+            }
+        } catch (e: Exception) {
+            try {
+                inputTensor?.close()
+                outputTensor?.close()
+            } catch (_: Exception) { }
+            Log.e("DeepFashionClassifier", "分类失败", e)
+            throw RuntimeException("分类失败", e)
+        }
+    }
+    private fun bitmapToFloatArray(bitmap: Bitmap): FloatArray {
+        val pixels = IntArray(inputSize * inputSize)
+        bitmap.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
+        val floatBuffer = FloatArray(3 * inputSize * inputSize)
+        val mean = floatArrayOf(0.485f, 0.456f, 0.406f)
+        val std = floatArrayOf(0.229f, 0.224f, 0.225f)
+        for (i in pixels.indices) {
+            val pixel = pixels[i]
+            val r = (pixel shr 16 and 0xFF) / 255.0f
+            val g = (pixel shr 8 and 0xFF) / 255.0f
+            val b = (pixel and 0xFF) / 255.0f
+            floatBuffer[i] = (r - mean[0]) / std[0]
+            floatBuffer[inputSize * inputSize + i] = (g - mean[1]) / std[1]
+            floatBuffer[2 * inputSize * inputSize + i] = (b - mean[2]) / std[2]
+        }
+        return floatBuffer
+    }
+    private fun softmax(logits: FloatArray): FloatArray {
+        val max = logits.maxOrNull() ?: 0f
+        val exp = logits.map { kotlin.math.exp(it - max) }
+        val sum = exp.sum()
+        return exp.map { (it / sum).toFloat() }.toFloatArray()
+    }
+    fun getThreadCount(): Int {
+        val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
+        return if (prefs.getBoolean("pref_performance_threads", true)) computeThreadCount() else 1
+    }
+    private fun computeThreadCount(): Int {
+        val cores = Runtime.getRuntime().availableProcessors()
+        return maxOf(2, cores / 2)
+    }
+    fun close() {
+        ortSession?.close()
+        ortSession = null
+    }
+    data class ClassificationResult(
+        val category: String,
+        val confidence: Float,
+        val description: String,
+        val categoryEn: String = category
+    )
+}
+// ===== ClassifierProvider.kt =====
+package com.deepfashion.classifier
+import android.content.Context
+import android.graphics.Bitmap
+import java.io.File
+import java.util.LinkedHashMap
+object ClassifierProvider {
+    private var classifier: DeepFashionClassifier? = null
+    private val cache = object : LinkedHashMap<String, DeepFashionClassifier.ClassificationResult>(21, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DeepFashionClassifier.ClassificationResult>?): Boolean {
+            return size > 20
+        }
+    }
+    @Synchronized
+    fun get(context: Context): DeepFashionClassifier {
+        if (classifier == null) {
+            classifier = DeepFashionClassifier(context.applicationContext)
+        }
+        return classifier!!
+    }
+    fun classifyImage(
+        context: Context,
+        bitmap: Bitmap,
+        imagePath: String? = null,
+        useCache: Boolean = true
+    ): DeepFashionClassifier.ClassificationResult {
+        val key = if (useCache) cacheKey(imagePath) else null
+        if (key != null) {
+            synchronized(cache) {
+                cache[key]?.let { return it }
+            }
+        }
+        val result = get(context).classifyImage(bitmap)
+        if (key != null) {
+            synchronized(cache) { cache[key] = result }
+        }
+        return result
+    }
+    fun classifyImageTopK(
+        context: Context,
+        bitmap: Bitmap,
+        k: Int = 3,
+        @Suppress("UNUSED_PARAMETER") imagePath: String? = null
+    ): List<DeepFashionClassifier.ClassificationResult> {
+        return get(context).classifyImageTopK(bitmap, k)
+    }
+    fun clearCache() {
+        synchronized(cache) { cache.clear() }
+    }
+    private fun cacheKey(imagePath: String?): String? {
+        if (imagePath.isNullOrBlank()) return null
+        val file = File(imagePath)
+        if (!file.exists()) return null
+        return "${file.absolutePath}:${file.lastModified()}"
+    }
+}
+// ===== HomeFragment.kt =====
+package com.deepfashion.classifier
+import android.content.Intent
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.fragment.app.Fragment
+import com.deepfashion.classifier.databinding.FragmentHomeBinding
+class HomeFragment : Fragment() {
+    private var _binding: FragmentHomeBinding? = null
+    private val binding get() = _binding!!
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        _binding = FragmentHomeBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+    override fun onResume() {
+        super.onResume()
+        loadSummary()
+    }
+    private fun loadSummary() {
+        val ctx = requireContext()
+        val summary = StatisticsRepository.getSummary(ctx)
+        binding.tvWeekStats.text = getString(R.string.home_week_count, summary.weekCount)
+        binding.tvTopCategory.text = if (summary.topCategory != null) {
+            getString(R.string.home_top_category, summary.topCategory, summary.topCategoryCount)
+        } else {
+            getString(R.string.home_no_history)
+        }
+        binding.recentContainer.removeAllViews()
+        val recent = HistoryRepository.loadAll(ctx, limit = 3)
+        if (recent.isEmpty()) {
+            val tv = TextView(ctx)
+            tv.text = getString(R.string.home_no_history)
+            binding.recentContainer.addView(tv)
+        } else {
+            recent.forEach { item ->
+                val tv = TextView(ctx)
+                tv.text = "${item.category} · ${(item.confidence * 100).toInt()}% · ${item.time}"
+                tv.setPadding(0, 8, 0, 8)
+                binding.recentContainer.addView(tv)
+            }
+        }
+        binding.btnQuickCamera.setOnClickListener {
+            startActivity(Intent(ctx, CameraActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+    }
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+}
+// ===== ClassifyFragment.kt =====
+package com.deepfashion.classifier
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.fragment.app.Fragment
+import com.deepfashion.classifier.databinding.FragmentClassifyBinding
+import java.io.InputStream
+class ClassifyFragment : Fragment() {
+    private var _binding: FragmentClassifyBinding? = null
+    private val binding get() = _binding!!
+    private var isProcessing = false
+    private val imagePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { handleSelectedImage(it) }
+    }
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        _binding = FragmentClassifyBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        binding.btnStartCamera.setOnClickListener {
+            startActivity(Intent(requireContext(), CameraActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        binding.btnSelectFromGallery.setOnClickListener {
+            if (!isProcessing) imagePickerLauncher.launch("image/*")
+        }
+        binding.btnBatchClassify.setOnClickListener {
+            startActivity(Intent(requireContext(), BatchClassifyActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+    }
+    private fun handleSelectedImage(uri: Uri) {
+        isProcessing = true
+        binding.btnSelectFromGallery.isEnabled = false
+        try {
+            val ctx = requireContext()
+            val imagesDir = java.io.File(ctx.filesDir, "images")
+            if (!imagesDir.exists()) imagesDir.mkdirs()
+            val targetFile = java.io.File(imagesDir, "${System.currentTimeMillis()}.jpg")
+            val inputStream: InputStream? = ctx.contentResolver.openInputStream(uri)
+            if (inputStream != null) {
+                targetFile.outputStream().use { output -> inputStream.copyTo(output) }
+                inputStream.close()
+            }
+            val bitmap = BitmapFactory.decodeFile(targetFile.absolutePath)
+            if (bitmap != null) {
+                classifyImage(bitmap, targetFile.absolutePath)
+            } else {
+                Toast.makeText(ctx, R.string.image_load_failed, Toast.LENGTH_SHORT).show()
+            }
+        } catch (_: Exception) {
+            Toast.makeText(requireContext(), R.string.image_read_failed, Toast.LENGTH_SHORT).show()
+        } finally {
+            isProcessing = false
+            binding.btnSelectFromGallery.isEnabled = true
+        }
+    }
+    private fun classifyImage(bitmap: android.graphics.Bitmap, imagePath: String?) {
+        try {
+            val result = ClassifierProvider.classifyImage(requireContext(), bitmap, imagePath)
+            val intent = Intent(requireContext(), ResultActivity::class.java)
+            intent.putExtra("category", result.category)
+            intent.putExtra("confidence", result.confidence)
+            intent.putExtra("description", result.description)
+            intent.putExtra("imagePath", imagePath)
+            intent.putExtra("fromHistory", false)
+            startActivity(intent)
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        } catch (_: Exception) {
+            Toast.makeText(requireContext(), R.string.classify_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+}
+// ===== CameraActivity.kt =====
+package com.deepfashion.classifier
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
+import android.media.MediaActionSound
+import android.net.Uri
+import android.os.Bundle
+import android.provider.Settings
+import android.util.Size
+import android.view.*
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.*
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.preference.PreferenceManager
+import com.deepfashion.classifier.databinding.ActivityCameraBinding
+import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+class CameraActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityCameraBinding
+    private lateinit var cameraExecutor: ExecutorService
+    private var imageCapture: ImageCapture? = null
+    private var camera: Camera? = null
+    private var cameraControl: CameraControl? = null
+    private var currentSelector: CameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+    private var isProcessing = false
+    private var burstMode = false
+    private var scaleGestureDetector: ScaleGestureDetector? = null
+    private var gestureDetector: GestureDetector? = null
+    private var currentZoomRatio = 1.0f
+    private var baseZoomRatio = 1.0f
+    private var focusIndicator: FocusIndicatorView? = null
+    private val shutterSound = MediaActionSound()
+    private val galleryLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { handleGalleryImage(it) }
+    }
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.all { it }) {
+            startCamera()
+        } else {
+            Snackbar.make(binding.root, R.string.camera_permission_required, Snackbar.LENGTH_LONG)
+                .setAction(R.string.open_app_settings) {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                    startActivity(intent)
+                }
+                .show()
+        }
+    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityCameraBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val defaultCamera = prefs.getString("pref_default_camera", "back") ?: "back"
+        currentSelector = if (defaultCamera == "front") {
+            CameraSelector.DEFAULT_FRONT_CAMERA
+        } else {
+            CameraSelector.DEFAULT_BACK_CAMERA
+        }
+        if (allPermissionsGranted()) {
+            startCamera()
+        } else {
+            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+        }
+        cameraExecutor = Executors.newSingleThreadExecutor()
+        setupUI()
+        setupGestureDetectors()
+        updateGridOverlay()
+    }
+    override fun onResume() {
+        super.onResume()
+        updateGridOverlay()
+    }
+    private fun updateGridOverlay() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val showGrid = prefs.getBoolean("pref_camera_grid", false)
+        binding.gridOverlay.visibility = if (showGrid) View.VISIBLE else View.GONE
+    }
+    private fun handleGalleryImage(uri: Uri) {
+        lifecycleScope.launch {
+            isProcessing = true
+            binding.btnCapture.isEnabled = false
+            try {
+                val safePath = withContext(Dispatchers.IO) {
+                    val imagesDir = java.io.File(filesDir, "images")
+                    if (!imagesDir.exists()) imagesDir.mkdirs()
+                    val target = java.io.File(imagesDir, "${System.currentTimeMillis()}.jpg")
+                    contentResolver.openInputStream(uri)?.use { it.copyTo(target.outputStream()) }
+                    target.absolutePath
+                }
+                val bitmap = BitmapFactory.decodeFile(safePath)
+                if (bitmap != null) {
+                    classifyAndNavigate(bitmap, safePath)
+                } else {
+                    Toast.makeText(this@CameraActivity, R.string.image_read_failed, Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                Toast.makeText(this@CameraActivity, R.string.image_read_failed, Toast.LENGTH_SHORT).show()
+            } finally {
+                isProcessing = false
+                binding.btnCapture.isEnabled = true
+            }
+        }
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+    private fun setupGestureDetectors() {
+        val parent = binding.viewFinder.parent as? ViewGroup
+        focusIndicator = FocusIndicatorView(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            visibility = View.GONE
+            elevation = 10f
+        }
+        parent?.addView(focusIndicator)
+        scaleGestureDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                val newZoom = currentZoomRatio * detector.scaleFactor
+                val zoomState = camera?.cameraInfo?.zoomState?.value
+                val minZoom = zoomState?.minZoomRatio ?: 1.0f
+                val maxZoom = zoomState?.maxZoomRatio ?: 10.0f
+                currentZoomRatio = newZoom.coerceIn(minZoom, maxZoom)
+                cameraControl?.setZoomRatio(currentZoomRatio)
+                return true
+            }
+        })
+        gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                handleFocusAndMetering(e.x, e.y)
+                return true
+            }
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                handleFocusAndMetering(e.x, e.y)
+                return true
+            }
+        })
+        binding.viewFinder.setOnTouchListener { _, event ->
+            scaleGestureDetector?.onTouchEvent(event)
+            gestureDetector?.onTouchEvent(event)
+            true
+        }
+    }
+    private fun handleFocusAndMetering(x: Float, y: Float) {
+        val control = cameraControl ?: return
+        val point = binding.viewFinder.meteringPointFactory.createPoint(x, y)
+        val focusAction = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
+            .setAutoCancelDuration(3, TimeUnit.SECONDS)
+            .build()
+        try {
+            control.startFocusAndMetering(focusAction)
+            focusIndicator?.show(x, y)
+        } catch (_: Exception) { }
+    }
+    private fun setupUI() {
+        binding.toggleCaptureMode.check(R.id.btnSingleMode)
+        binding.toggleCaptureMode.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                burstMode = checkedId == R.id.btnBurstMode
+            }
+        }
+        binding.btnCapture.setOnClickListener {
+            if (!isProcessing) {
+                if (burstMode) startBurstCapture() else takePhoto()
+            }
+        }
+        binding.btnSwitchCamera.setOnClickListener { switchCamera() }
+        binding.btnGallery.setOnClickListener {
+            if (!isProcessing) galleryLauncher.launch("image/*")
+        }
+        binding.btnHistory.setOnClickListener {
+            val intent = Intent(this, MainContainerActivity::class.java)
+            intent.putExtra(MainContainerActivity.EXTRA_TAB, MainContainerActivity.TAB_HISTORY)
+            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
+            startActivity(intent)
+            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+    }
+    private fun getCaptureResolution(): Size {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        return when (prefs.getString("pref_camera_resolution", "high")) {
+            "low" -> Size(640, 480)
+            "medium" -> Size(1280, 720)
+            else -> Size(1920, 1080)
+        }
+    }
+    private fun startCamera() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            val cameraProvider = cameraProviderFuture.get()
+            val resolution = getCaptureResolution()
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
+            }
+            imageCapture = ImageCapture.Builder()
+                .setTargetResolution(resolution)
+                .build()
+            try {
+                cameraProvider.unbindAll()
+                camera = cameraProvider.bindToLifecycle(this, currentSelector, preview, imageCapture)
+                cameraControl = camera?.cameraControl
+                val zoomState = camera?.cameraInfo?.zoomState?.value
+                baseZoomRatio = zoomState?.zoomRatio ?: 1.0f
+                if (currentZoomRatio == 1.0f || currentZoomRatio == baseZoomRatio) {
+                    currentZoomRatio = baseZoomRatio
+                } else {
+                    val minZoom = zoomState?.minZoomRatio ?: 1.0f
+                    val maxZoom = zoomState?.maxZoomRatio ?: 10.0f
+                    currentZoomRatio = currentZoomRatio.coerceIn(minZoom, maxZoom)
+                    cameraControl?.setZoomRatio(currentZoomRatio)
+                }
+            } catch (_: Exception) { }
+        }, ContextCompat.getMainExecutor(this))
+    }
+    private fun switchCamera() {
+        currentSelector = if (currentSelector == CameraSelector.DEFAULT_BACK_CAMERA) {
+            CameraSelector.DEFAULT_FRONT_CAMERA
+        } else {
+            CameraSelector.DEFAULT_BACK_CAMERA
+        }
+        currentZoomRatio = 1.0f
+        startCamera()
+    }
+    private fun playShutterSound() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        if (prefs.getBoolean("pref_shutter_sound", true)) {
+            try { shutterSound.play(MediaActionSound.SHUTTER_CLICK) } catch (_: Exception) { }
+        }
+    }
+    private fun takePhoto() {
+        val capture = imageCapture ?: return
+        isProcessing = true
+        binding.btnCapture.isEnabled = false
+        playShutterSound()
+        val photoFile = java.io.File(getExternalFilesDir(null), "deepfashion_${System.currentTimeMillis()}.jpg")
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+        capture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(this),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onError(exception: ImageCaptureException) {
+                    Toast.makeText(this@CameraActivity, R.string.capture_failed, Toast.LENGTH_SHORT).show()
+                    resetCaptureState()
+                }
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    val safePath = copyToInternalStorage(photoFile)
+                    val bitmap = BitmapFactory.decodeFile(safePath)
+                    if (bitmap != null) {
+                        lifecycleScope.launch { classifyAndNavigate(bitmap, safePath) }
+                    } else {
+                        Toast.makeText(this@CameraActivity, R.string.image_load_failed, Toast.LENGTH_SHORT).show()
+                        resetCaptureState()
+                    }
+                }
+            }
+        )
+    }
+    private fun startBurstCapture() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val count = prefs.getString("pref_burst_count", "5")?.toIntOrNull() ?: 5
+        val strategy = prefs.getString("pref_burst_strategy", "best") ?: "best"
+        isProcessing = true
+        binding.btnCapture.isEnabled = false
+        binding.tvBurstProgress.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            val results = mutableListOf<Triple<String, DeepFashionClassifier.ClassificationResult, android.graphics.Bitmap>>()
+            repeat(count) { index ->
+                binding.tvBurstProgress.text = getString(R.string.burst_progress, index + 1, count)
+                val path = captureOnePhotoSync()
+                if (path != null) {
+                    val bitmap = BitmapFactory.decodeFile(path)
+                    if (bitmap != null) {
+                        val result = withContext(Dispatchers.Default) {
+                            ClassifierProvider.classifyImage(this@CameraActivity, bitmap, path)
+                        }
+                        results.add(Triple(path, result, bitmap))
+                    }
+                }
+                if (index < count - 1) delay(300)
+            }
+            binding.tvBurstProgress.visibility = View.GONE
+            handleBurstResults(results, strategy)
+            resetCaptureState()
+        }
+    }
+    private suspend fun captureOnePhotoSync(): String? = withContext(Dispatchers.Main) {
+        val capture = imageCapture ?: return@withContext null
+        playShutterSound()
+        val photoFile = java.io.File(getExternalFilesDir(null), "burst_${System.currentTimeMillis()}.jpg")
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+        kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+            capture.takePicture(
+                outputOptions,
+                ContextCompat.getMainExecutor(this@CameraActivity),
+                object : ImageCapture.OnImageSavedCallback {
+                    override fun onError(exception: ImageCaptureException) {
+                        if (cont.isActive) cont.resume(null)
+                    }
+                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                        if (cont.isActive) cont.resume(copyToInternalStorage(photoFile))
+                    }
+                }
+            )
+        }
+    }
+    private fun copyToInternalStorage(photoFile: java.io.File): String {
+        return try {
+            val imagesDir = java.io.File(filesDir, "images")
+            if (!imagesDir.exists()) imagesDir.mkdirs()
+            val target = java.io.File(imagesDir, "${System.currentTimeMillis()}.jpg")
+            photoFile.copyTo(target, overwrite = true)
+            target.absolutePath
+        } catch (_: Exception) {
+            photoFile.absolutePath
+        }
+    }
+    private fun handleBurstResults(
+        results: List<Triple<String, DeepFashionClassifier.ClassificationResult, android.graphics.Bitmap>>,
+        strategy: String
+    ) {
+        if (results.isEmpty()) {
+            Toast.makeText(this, R.string.capture_failed, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (strategy == "all") {
+            BatchResultStore.items = results.map { (path, result, _) ->
+                BatchResultItem(path, result.category, result.confidence, result.description)
+            }
+            startActivity(Intent(this, BatchResultActivity::class.java))
+            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        } else {
+            val best = results.maxByOrNull { it.second.confidence }!!
+            navigateToResult(best.second, best.first)
+        }
+    }
+    private suspend fun classifyAndNavigate(bitmap: android.graphics.Bitmap, imagePath: String?) {
+        isProcessing = true
+        binding.btnCapture.isEnabled = false
+        try {
+            val result = withContext(Dispatchers.Default) {
+                ClassifierProvider.classifyImage(this@CameraActivity, bitmap, imagePath)
+            }
+            navigateToResult(result, imagePath)
+        } catch (_: Exception) {
+            Toast.makeText(this@CameraActivity, R.string.classify_failed, Toast.LENGTH_SHORT).show()
+        } finally {
+            resetCaptureState()
+        }
+    }
+    private fun navigateToResult(result: DeepFashionClassifier.ClassificationResult, imagePath: String?) {
+        val intent = Intent(this, ResultActivity::class.java)
+        intent.putExtra("category", result.category)
+        intent.putExtra("confidence", result.confidence)
+        intent.putExtra("description", result.description)
+        intent.putExtra("imagePath", imagePath)
+        intent.putExtra("fromHistory", false)
+        startActivity(intent)
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+    }
+    private fun resetCaptureState() {
+        isProcessing = false
+        binding.btnCapture.isEnabled = true
+    }
+    private fun allPermissionsGranted() =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    override fun onBackPressed() {
+        super.onBackPressed()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+    }
+    override fun onDestroy() {
+        super.onDestroy()
+        cameraExecutor.shutdown()
+        shutterSound.release()
+    }
+}
+// ===== GridOverlayView.kt =====
+package com.deepfashion.classifier
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.util.AttributeSet
+import android.view.View
+class GridOverlayView @JvmOverloads constructor(
+    context: Context, attrs: AttributeSet? = null
+) : View(context, attrs) {
+    private val paint = Paint().apply {
+        color = 0x66FFFFFF
+        strokeWidth = 1.5f
+        style = Paint.Style.STROKE
+    }
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val w = width.toFloat()
+        val h = height.toFloat()
+        canvas.drawLine(w / 3, 0f, w / 3, h, paint)
+        canvas.drawLine(2 * w / 3, 0f, 2 * w / 3, h, paint)
+        canvas.drawLine(0f, h / 3, w, h / 3, paint)
+        canvas.drawLine(0f, 2 * h / 3, w, 2 * h / 3, paint)
+    }
+}
+// ===== FocusIndicatorView.kt =====
+package com.deepfashion.classifier
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
+import android.util.AttributeSet
+import android.view.View
+import android.view.animation.AlphaAnimation
+import android.view.animation.Animation
+class FocusIndicatorView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null
+) : View(context, attrs) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+        color = 0xFFFFEB3B.toInt() // yellow
+    }
+    private var focusRect = Rect()
+    private var isShowing = false
+    companion object {
+        private const val SIZE = 100 // dp, will be converted to pixels
+    }
+    fun show(x: Float, y: Float) {
+        val sizePx = (SIZE * resources.displayMetrics.density).toInt()
+        focusRect.set(
+            (x - sizePx / 2).toInt(),
+            (y - sizePx / 2).toInt(),
+            (x + sizePx / 2).toInt(),
+            (y + sizePx / 2).toInt()
+        )
+        isShowing = true
+        visibility = VISIBLE
+        invalidate()
+        // 淡出动画
+        val fadeOut = AlphaAnimation(1f, 0f).apply {
+            duration = 800
+            startOffset = 500
+            setAnimationListener(object : Animation.AnimationListener {
+                override fun onAnimationStart(animation: Animation?) {}
+                override fun onAnimationEnd(animation: Animation?) {
+                    isShowing = false
+                    visibility = GONE
+                }
+                override fun onAnimationRepeat(animation: Animation?) {}
+            })
+        }
+        startAnimation(fadeOut)
+    }
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (isShowing) {
+            // 绘制对焦框（四个角的L形）
+            val cornerLength = 20f * resources.displayMetrics.density
+            // 左上角
+            canvas.drawLine(
+                focusRect.left.toFloat(), focusRect.top.toFloat(),
+                focusRect.left + cornerLength, focusRect.top.toFloat(), paint
+            )
+            canvas.drawLine(
+                focusRect.left.toFloat(), focusRect.top.toFloat(),
+                focusRect.left.toFloat(), focusRect.top + cornerLength, paint
+            )
+            // 右上角
+            canvas.drawLine(
+                focusRect.right.toFloat(), focusRect.top.toFloat(),
+                focusRect.right - cornerLength, focusRect.top.toFloat(), paint
+            )
+            canvas.drawLine(
+                focusRect.right.toFloat(), focusRect.top.toFloat(),
+                focusRect.right.toFloat(), focusRect.top + cornerLength, paint
+            )
+            // 左下角
+            canvas.drawLine(
+                focusRect.left.toFloat(), focusRect.bottom.toFloat(),
+                focusRect.left + cornerLength, focusRect.bottom.toFloat(), paint
+            )
+            canvas.drawLine(
+                focusRect.left.toFloat(), focusRect.bottom.toFloat(),
+                focusRect.left.toFloat(), focusRect.bottom - cornerLength, paint
+            )
+            // 右下角
+            canvas.drawLine(
+                focusRect.right.toFloat(), focusRect.bottom.toFloat(),
+                focusRect.right - cornerLength, focusRect.bottom.toFloat(), paint
+            )
+            canvas.drawLine(
+                focusRect.right.toFloat(), focusRect.bottom.toFloat(),
+                focusRect.right.toFloat(), focusRect.bottom - cornerLength, paint
+            )
+        }
+    }
+}
+// ===== BatchClassifyActivity.kt =====
+package com.deepfashion.classifier
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Bundle
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.deepfashion.classifier.databinding.ActivityBatchClassifyBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.InputStream
+class BatchClassifyActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityBatchClassifyBinding
+    private val multiPicker = registerForActivityResult(
+        ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) processImages(uris)
+    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityBatchClassifyBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        title = getString(R.string.batch_classify)
+        binding.btnSelectImages.setOnClickListener { multiPicker.launch("image/*") }
+    }
+    private fun processImages(uris: List<Uri>) {
+        binding.btnSelectImages.isEnabled = false
+        binding.progressBar.max = uris.size
+        binding.progressBar.progress = 0
+        lifecycleScope.launch {
+            val results = withContext(Dispatchers.Default) {
+                val list = mutableListOf<BatchResultItem>()
+                uris.forEachIndexed { index, uri ->
+                    try {
+                        val imagesDir = java.io.File(filesDir, "images")
+                        if (!imagesDir.exists()) imagesDir.mkdirs()
+                        val target = java.io.File(imagesDir, "batch_${System.currentTimeMillis()}_$index.jpg")
+                        val input: InputStream? = contentResolver.openInputStream(uri)
+                        input?.use { it.copyTo(target.outputStream()) }
+                        val bitmap = BitmapFactory.decodeFile(target.absolutePath)
+                        if (bitmap != null) {
+                            val r = ClassifierProvider.classifyImage(this@BatchClassifyActivity, bitmap, target.absolutePath)
+                            list.add(BatchResultItem(target.absolutePath, r.category, r.confidence, r.description))
+                        }
+                    } catch (_: Exception) { }
+                    withContext(Dispatchers.Main) {
+                        binding.progressBar.progress = index + 1
+                        binding.tvProgress.text = getString(R.string.batch_progress, index + 1, uris.size)
+                    }
+                }
+                list
+            }
+            BatchResultStore.items = results
+            if (results.isEmpty()) {
+                Toast.makeText(this@BatchClassifyActivity, R.string.classify_failed, Toast.LENGTH_SHORT).show()
+                binding.btnSelectImages.isEnabled = true
+            } else {
+                startActivity(Intent(this@BatchClassifyActivity, BatchResultActivity::class.java))
+                finish()
+            }
+        }
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== BatchResultActivity.kt =====
+package com.deepfashion.classifier
+import android.content.Intent
+import android.os.Bundle
+import android.view.View
+import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.deepfashion.classifier.databinding.ActivityBatchResultBinding
+class BatchResultActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityBatchResultBinding
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityBatchResultBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        title = getString(R.string.batch_results)
+        val items = BatchResultStore.items
+        val display = items.map { "${it.category} · ${(it.confidence * 100).toInt()}%" }
+        binding.listBatchResults.adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, display) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val v = super.getView(position, convertView, parent) as TextView
+                v.setPadding(24, 24, 24, 24)
+                return v
+            }
+        }
+        binding.listBatchResults.onItemClickListener = AdapterView.OnItemClickListener { _, _, pos, _ ->
+            openResult(items[pos])
+        }
+        binding.btnSaveAll.setOnClickListener {
+            if (items.isEmpty()) return@setOnClickListener
+            binding.btnSaveAll.isEnabled = false
+            var saved = 0
+            items.forEach { item ->
+                HistoryRepository.addEntry(this, item.category, item.confidence, item.imagePath)
+                saved++
+            }
+            Toast.makeText(this, getString(R.string.batch_save_success, saved), Toast.LENGTH_SHORT).show()
+            binding.btnSaveAll.isEnabled = true
+        }
+    }
+    private fun openResult(item: BatchResultItem) {
+        val intent = Intent(this, ResultActivity::class.java)
+        intent.putExtra("category", item.category)
+        intent.putExtra("confidence", item.confidence)
+        intent.putExtra("description", item.description)
+        intent.putExtra("imagePath", item.imagePath)
+        intent.putExtra("fromHistory", false)
+        startActivity(intent)
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== BatchResultStore.kt =====
+package com.deepfashion.classifier
+data class BatchResultItem(
+    val imagePath: String,
+    val category: String,
+    val confidence: Float,
+    val description: String
+)
+object BatchResultStore {
+    var items: List<BatchResultItem> = emptyList()
+}
+// ===== ResultActivity.kt =====
+package com.deepfashion.classifier
+import android.content.ContentValues
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.Build
+import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+import android.widget.Toast
+import com.google.android.material.tabs.TabLayout
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
+import androidx.palette.graphics.Palette
+import androidx.preference.PreferenceManager
+import com.deepfashion.classifier.databinding.ActivityResultBinding
+import java.io.File
+import java.io.FileOutputStream
+class ResultActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityResultBinding
+    private var category: String = ""
+    private var confidence: Float = 0f
+    private var imagePath: String? = null
+    private var isFavorite: Boolean = false
+    private var currentHistoryItem: HistoryItem? = null
+    private var topResults: List<DeepFashionClassifier.ClassificationResult> = emptyList()
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityResultBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        category = intent.getStringExtra("category") ?: "未知"
+        confidence = intent.getFloatExtra("confidence", 0f)
+        imagePath = intent.getStringExtra("imagePath")
+        setupUI()
+    }
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.menu_result, menu)
+        // 如果是历史记录，加载收藏状态并显示收藏按钮
+        val fromHistory = intent.getBooleanExtra("fromHistory", false)
+        if (fromHistory) {
+            loadFavoriteStatus()
+            updateFavoriteIcon(menu)
+        } else {
+            // 新识别的结果，还没有保存，不显示收藏按钮
+            menu?.findItem(R.id.action_favorite)?.isVisible = false
+        }
+        return true
+    }
+    override fun onPrepareOptionsMenu(menu: Menu?): Boolean {
+        val fromHistory = intent.getBooleanExtra("fromHistory", false)
+        if (fromHistory) {
+            updateFavoriteIcon(menu)
+        }
+        return super.onPrepareOptionsMenu(menu)
+    }
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_favorite -> {
+                toggleFavorite()
+                true
+            }
+            R.id.action_share -> {
+                showShareDialog()
+                true
+            }
+            R.id.action_crop -> {
+                if (!imagePath.isNullOrBlank()) {
+                    val intent = Intent(this, ImageCropActivity::class.java)
+                    intent.putExtra("imagePath", imagePath)
+                    startActivity(intent)
+                }
+                true
+            }
+            R.id.action_enhance -> {
+                if (!imagePath.isNullOrBlank()) {
+                    val intent = Intent(this, ImageEnhanceActivity::class.java)
+                    intent.putExtra("imagePath", imagePath)
+                    startActivity(intent)
+                }
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+    private fun loadFavoriteStatus() {
+        // 尝试从历史记录中查找当前项
+        val allItems = HistoryRepository.loadAll(this)
+        currentHistoryItem = allItems.find { item ->
+            item.category == category &&
+            kotlin.math.abs(item.confidence - confidence) < 0.001f &&
+            item.imagePath == imagePath
+        }
+        isFavorite = currentHistoryItem?.isFavorite ?: false
+    }
+    private fun updateFavoriteIcon(menu: Menu?) {
+        val favoriteItem = menu?.findItem(R.id.action_favorite)
+        favoriteItem?.let {
+            if (isFavorite) {
+                it.icon = getDrawable(R.drawable.ic_favorite_filled)
+                it.title = getString(R.string.favorite_removed)
+            } else {
+                it.icon = getDrawable(R.drawable.ic_favorite_outline)
+                it.title = getString(R.string.favorite_added)
+            }
+        }
+    }
+    private fun toggleFavorite() {
+        val fromHistory = intent.getBooleanExtra("fromHistory", false)
+        if (fromHistory && currentHistoryItem != null) {
+            // 从历史记录切换收藏
+            isFavorite = HistoryRepository.toggleFavorite(this, currentHistoryItem!!)
+            // 更新当前项的收藏状态
+            currentHistoryItem = HistoryItem(
+                time = currentHistoryItem!!.time,
+                category = currentHistoryItem!!.category,
+                confidence = currentHistoryItem!!.confidence,
+                imagePath = currentHistoryItem!!.imagePath,
+                isFavorite = isFavorite
+            )
+            invalidateOptionsMenu()
+        } else if (!fromHistory) {
+            // 新识别的结果，先保存到历史再收藏
+            try {
+                val savedItem = HistoryRepository.addEntry(this, category, confidence, imagePath)
+                if (savedItem != null) {
+                    isFavorite = HistoryRepository.toggleFavorite(this, savedItem)
+                    invalidateOptionsMenu()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this, "保存失败", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    private fun showShareDialog() {
+        val options = arrayOf(
+            getString(R.string.share_text),
+            getString(R.string.share_image)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.select_share_method))
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> shareAsText()
+                    1 -> shareAsImage()
+                }
+            }
+            .show()
+    }
+    private fun shareAsText() {
+        val description = intent.getStringExtra("description") ?: ""
+        val shareText = "${category} - ${(confidence * 100).toInt()}%\n$description"
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, shareText)
+        }
+        startActivity(Intent.createChooser(intent, getString(R.string.share)))
+    }
+    private fun shareAsImage() {
+        try {
+            // 获取卡片视图（只分享卡片内容，不包括按钮）
+            val cardView = binding.cardResult
+            // 测量和布局视图
+            val widthSpec = View.MeasureSpec.makeMeasureSpec(
+                resources.displayMetrics.widthPixels - 40, // 减去 padding
+                View.MeasureSpec.EXACTLY
+            )
+            val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            cardView.measure(widthSpec, heightSpec)
+            cardView.layout(0, 0, cardView.measuredWidth, cardView.measuredHeight)
+            // 创建 Bitmap
+            val bitmap = Bitmap.createBitmap(
+                cardView.measuredWidth,
+                cardView.measuredHeight,
+                Bitmap.Config.ARGB_8888
+            )
+            // 将视图绘制到 Bitmap
+            val canvas = android.graphics.Canvas(bitmap)
+            canvas.drawColor(android.graphics.Color.WHITE)
+            cardView.draw(canvas)
+            val watermarked = ShareImageHelper.drawWatermark(this, bitmap, category, confidence)
+            val cacheDir = File(cacheDir, "share")
+            cacheDir.mkdirs()
+            val tempFile = File(cacheDir, "share_${System.currentTimeMillis()}.png")
+            FileOutputStream(tempFile).use { out ->
+                watermarked.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+            bitmap.recycle()
+            if (watermarked != bitmap) watermarked.recycle()
+            // 使用 FileProvider 分享图片
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                tempFile
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, getString(R.string.share)))
+            // 分享完成后延迟删除临时文件（3秒后）
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try {
+                    if (tempFile.exists()) {
+                        tempFile.delete()
+                    }
+                } catch (_: Exception) { }
+            }, 3000)
+        } catch (e: Exception) {
+            Toast.makeText(this, "分享失败", Toast.LENGTH_SHORT).show()
+        }
+    }
+    private fun setupUI() {
+        val description = intent.getStringExtra("description") ?: ""
+        binding.tvCategory.text = category
+        binding.tvConfidence.text = "${(confidence * 100).toInt()}%"
+        binding.progressConfidence.progress = (confidence * 100).toInt()
+        // parse multi-line description to sections
+        val map = HashMap<String, String>()
+        description.split('\n').forEach { line ->
+            val idx = line.indexOf(':')
+            if (idx > 0) {
+                val k = line.substring(0, idx).trim()
+                val v = line.substring(idx + 1).trim()
+                map[k] = v
+            }
+        }
+        val isZh = resources.configuration.locales[0].language.startsWith("zh")
+        binding.labelStyle.text = if (isZh) "风格" else "Style"
+        binding.labelScene.text = if (isZh) "场景" else "Occasions"
+        binding.labelPair.text = if (isZh) "搭配" else "Pairing"
+        binding.labelSeason.text = if (isZh) "季节/材质" else "Season/Fabric"
+        binding.labelCare.text = if (isZh) "护理" else "Care"
+        val styleText = map[if (isZh) "风格" else "Style"] ?: ""
+        val sceneText = map[if (isZh) "场景" else "Occasions"] ?: ""
+        val pairText = map[if (isZh) "搭配" else "Pairing"] ?: ""
+        val seasonText = map[if (isZh) "季节材质" else "Season/Fabric"]
+            ?: map[if (isZh) "季节/材质" else "Season/Fabric"] ?: ""
+        val careText = map[if (isZh) "护理" else "Care"] ?: ""
+        val placeholder = if (isZh) "暂无" else "N/A"
+        binding.tvStyle.text = if (styleText.isNotBlank()) styleText else placeholder
+        binding.tvScene.text = if (sceneText.isNotBlank()) sceneText else placeholder
+        binding.tvPair.text = if (pairText.isNotBlank()) pairText else placeholder
+        binding.tvSeason.text = if (seasonText.isNotBlank()) seasonText else placeholder
+        binding.tvCare.text = if (careText.isNotBlank()) careText else placeholder
+        // thumbnail
+        if (!imagePath.isNullOrBlank()) {
+            try {
+                val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeFile(imagePath, opts)
+                var sample = 1
+                val target = 720
+                while (opts.outWidth / sample > target || opts.outHeight / sample > target) {
+                    sample *= 2
+                }
+                val opts2 = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+                val bmp = android.graphics.BitmapFactory.decodeFile(imagePath, opts2)
+                binding.imgThumb.setImageBitmap(bmp)
+                binding.imgThumb.setOnClickListener {
+                    val itn = Intent(this, FullImageActivity::class.java)
+                    itn.putExtra("imagePath", imagePath)
+                    startActivity(itn)
+                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+                }
+                // build palette bar under thumbnail - small squares with hex labels
+                bmp?.let {
+                    Palette.from(it).clearFilters().generate { pal ->
+                        val bar = binding.paletteBarResult
+                        bar.removeAllViews()
+                        val colors = mutableListOf<Int>()
+                        fun add(c: Int?) { if (c != null && c != 0 && !colors.contains(c)) colors.add(c) }
+                        add(pal?.vibrantSwatch?.rgb)
+                        add(pal?.lightVibrantSwatch?.rgb)
+                        add(pal?.darkVibrantSwatch?.rgb)
+                        add(pal?.mutedSwatch?.rgb)
+                        add(pal?.lightMutedSwatch?.rgb)
+                        add(pal?.darkMutedSwatch?.rgb)
+                        add(pal?.dominantSwatch?.rgb)
+                        if (colors.isEmpty()) {
+                            bar.visibility = android.view.View.GONE
+                        } else {
+                            bar.visibility = android.view.View.VISIBLE
+                            val sizeDp = 48f
+                            val density = resources.displayMetrics.density
+                            val size = (sizeDp * density).toInt()
+                            val marginDp = 8f
+                            val margin = (marginDp * density).toInt()
+                            colors.forEach { color ->
+                                // Create a FrameLayout to contain square and text
+                                val container = android.widget.FrameLayout(this)
+                                val lp = LinearLayout.LayoutParams(size, size)
+                                lp.marginEnd = margin
+                                container.layoutParams = lp
+                                // Create colored square
+                                val square = android.view.View(this)
+                                square.setBackgroundColor(color)
+                                val squareLp = android.widget.FrameLayout.LayoutParams(
+                                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                                )
+                                square.layoutParams = squareLp
+                                container.addView(square)
+                                // Create hex text label
+                                val hexText = android.widget.TextView(this)
+                                val hex = String.format("#%06X", 0xFFFFFF and color)
+                                hexText.text = hex
+                                hexText.textSize = 8f // small text
+                                hexText.setTextColor(android.graphics.Color.WHITE)
+                                hexText.setShadowLayer(2f, 1f, 1f, android.graphics.Color.BLACK)
+                                hexText.gravity = android.view.Gravity.CENTER
+                                val textLp = android.widget.FrameLayout.LayoutParams(
+                                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                                )
+                                hexText.layoutParams = textLp
+                                container.addView(hexText)
+                                bar.addView(container)
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) { }
+        }
+        val fromHistory = intent.getBooleanExtra("fromHistory", false)
+        // 根据设置控制展示密度（精简/标准/详细三种模式）
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val density = prefs.getString("pref_result_density", "standard") ?: "standard"
+        if (fromHistory) {
+            binding.btnRetake.text = getString(R.string.back)
+            // 历史详情仅展示图片/结果/置信度
+            binding.sectionsContainer.visibility = android.view.View.GONE
+            binding.btnSave.text = getString(R.string.save_image)
+            // 从历史记录打开时，保存按钮保存图片到相册
+            binding.btnSave.setOnClickListener {
+                saveImageToGallery()
+            }
+        } else {
+            // 根据密度设置显示不同内容
+            when (density) {
+                "compact" -> {
+                    // 精简模式：只显示图片、类别、置信度，隐藏所有详细信息
+                    binding.sectionsContainer.visibility = android.view.View.GONE
+                }
+                "standard" -> {
+                    // 标准模式：显示图片、类别、置信度，以及风格和场景
+                    binding.sectionsContainer.visibility = android.view.View.VISIBLE
+                    binding.sectionStyle.visibility = android.view.View.VISIBLE
+                    binding.sectionScene.visibility = android.view.View.VISIBLE
+                    binding.sectionPair.visibility = android.view.View.GONE
+                    binding.sectionSeason.visibility = android.view.View.GONE
+                    binding.sectionCare.visibility = android.view.View.GONE
+                }
+                "detailed" -> {
+                    // 详细模式：显示所有信息
+                    binding.sectionsContainer.visibility = android.view.View.VISIBLE
+                    binding.sectionStyle.visibility = android.view.View.VISIBLE
+                    binding.sectionScene.visibility = android.view.View.VISIBLE
+                    binding.sectionPair.visibility = android.view.View.VISIBLE
+                    binding.sectionSeason.visibility = android.view.View.VISIBLE
+                    binding.sectionCare.visibility = android.view.View.VISIBLE
+                }
+                else -> {
+                    // 默认使用标准模式
+                    binding.sectionsContainer.visibility = android.view.View.VISIBLE
+                    binding.sectionStyle.visibility = android.view.View.VISIBLE
+                    binding.sectionScene.visibility = android.view.View.VISIBLE
+                    binding.sectionPair.visibility = android.view.View.GONE
+                    binding.sectionSeason.visibility = android.view.View.GONE
+                    binding.sectionCare.visibility = android.view.View.GONE
+                }
+            }
+            // 新识别结果时，保存按钮保存到历史记录
+            binding.btnSave.setOnClickListener {
+                try {
+                    val savedItem = HistoryRepository.addEntry(this, category, confidence, imagePath)
+            hideKeyboard()
+            false
+        }
+        binding.btnFilterCategory.setOnClickListener {
+            hideKeyboard()
+            showCategoryFilterDialog()
+        }
+        binding.btnFilterConfidence.setOnClickListener {
+            hideKeyboard()
+            showConfidenceFilterDialog()
+        }
+        binding.btnFilterTime.setOnClickListener {
+            hideKeyboard()
+            showTimeFilterDialog()
+        }
+    }
+    private fun hideKeyboard() {
+        val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(binding.editSearch.windowToken, 0)
+        binding.editSearch.clearFocus()
+    }
+    private fun showCategoryFilterDialog() {
+        val isZh = resources.configuration.locales[0].language.startsWith("zh")
+        val categories = CategoryRepository.englishNames
+        val items = categories.map { cat ->
+            CategoryRepository.getDisplayName(cat, isZh) to (cat in selectedCategories)
+        }.toTypedArray()
+        val selected = BooleanArray(items.size) { items[it].second }
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.filter_by_category)
+            .setMultiChoiceItems(items.map { it.first }.toTypedArray(), selected) { _, which, isChecked ->
+                selected[which] = isChecked
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                selectedCategories = categories.filterIndexed { index, _ -> selected[index] }.toSet()
+                updateFilterChips()
+                applyFilters()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+    private fun showConfidenceFilterDialog() {
+        val items = arrayOf(
+            getString(R.string.filter_time_all), "≥ 50%", "≥ 60%", "≥ 70%", "≥ 80%", "≥ 90%"
+        )
+        var selectedIndex = when (minConfidence) {
+            0 -> 0; 50 -> 1; 60 -> 2; 70 -> 3; 80 -> 4; 90 -> 5; else -> 0
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.filter_by_confidence)
+            .setSingleChoiceItems(items, selectedIndex) { _, which -> selectedIndex = which }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                minConfidence = when (selectedIndex) {
+                    0 -> 0; 1 -> 50; 2 -> 60; 3 -> 70; 4 -> 80; 5 -> 90; else -> 0
+                }
+                updateFilterChips()
+                applyFilters()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+    private fun showTimeFilterDialog() {
+        val items = arrayOf(
+            getString(R.string.filter_time_all),
+            getString(R.string.filter_time_today),
+            getString(R.string.filter_time_week),
+            getString(R.string.filter_time_month)
+        )
+        var selectedIndex = timeFilter.ordinal
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.filter_by_time)
+            .setSingleChoiceItems(items, selectedIndex) { _, which -> selectedIndex = which }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                timeFilter = TimeRange.values()[selectedIndex]
+                updateFilterChips()
+                applyFilters()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+    private fun updateFilterChips() {
+        binding.chipGroupFilters.removeAllViews()
+        if (showFavoritesOnly) {
+            binding.chipGroupFilters.addView(createChip(getString(R.string.filter_favorites_only)) {
+                showFavoritesOnly = false
+                updateFilterChips()
+                applyFilters()
+            })
+        }
+        if (selectedCategories.isNotEmpty()) {
+            val isZh = resources.configuration.locales[0].language.startsWith("zh")
+            val names = selectedCategories.joinToString(", ") {
+                CategoryRepository.getDisplayName(it, isZh)
+            }
+            binding.chipGroupFilters.addView(createChip("${getString(R.string.filter_category_prefix)}$names") {
+                selectedCategories = emptySet()
+                updateFilterChips()
+                applyFilters()
+            })
+        }
+        if (minConfidence > 0) {
+            binding.chipGroupFilters.addView(createChip("≥ ${minConfidence}%") {
+                minConfidence = 0
+                updateFilterChips()
+                applyFilters()
+            })
+        }
+        if (timeFilter != TimeRange.ALL) {
+            val label = when (timeFilter) {
+                TimeRange.TODAY -> getString(R.string.filter_time_today)
+                TimeRange.WEEK -> getString(R.string.filter_time_week)
+                TimeRange.MONTH -> getString(R.string.filter_time_month)
+                else -> ""
+            }
+            binding.chipGroupFilters.addView(createChip(label) {
+                timeFilter = TimeRange.ALL
+                updateFilterChips()
+                applyFilters()
+            })
+        }
+        if (searchQuery.isNotEmpty()) {
+            binding.chipGroupFilters.addView(createChip(searchQuery) {
+                searchQuery = ""
+                binding.editSearch.setText("")
+                updateFilterChips()
+                applyFilters()
+            })
+        }
+    }
+    private fun createChip(text: String, onClose: () -> Unit): Chip {
+        return Chip(requireContext()).apply {
+            this.text = text
+            isCloseIconVisible = true
+            setOnCloseIconClickListener { onClose() }
+            setEnsureMinTouchTargetSize(false)
+        }
+    }
+    private fun applyFilters() {
+        val isZh = resources.configuration.locales[0].language.startsWith("zh")
+        filteredItems = allItems.filter { item ->
+            val matchFavorite = !showFavoritesOnly || item.isFavorite
+            val catEn = CategoryRepository.getEnglishName(item.category) ?: item.category
+            val matchCategory = selectedCategories.isEmpty() ||
+                item.category in selectedCategories ||
+                catEn in selectedCategories
+            val matchConfidence = (item.confidence * 100).toInt() >= minConfidence
+            val matchTime = when (timeFilter) {
+                TimeRange.ALL -> true
+                TimeRange.TODAY -> isToday(item.time)
+                TimeRange.WEEK -> isWithinWeek(item.time)
+                TimeRange.MONTH -> isWithinMonth(item.time)
+            }
+            val matchSearch = searchQuery.isEmpty() ||
+                item.category.contains(searchQuery, ignoreCase = true) ||
+                item.time.contains(searchQuery, ignoreCase = true)
+            matchFavorite && matchCategory && matchConfidence && matchTime && matchSearch
+        }
+        adapter.update(filteredItems)
+        updateFilterChips()
+    }
+    private fun isToday(timeStr: String): Boolean = try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val itemDate = sdf.format(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timeStr) ?: Date())
+        itemDate == sdf.format(Date())
+    } catch (_: Exception) { false }
+    private fun isWithinWeek(timeStr: String): Boolean {
+        return try {
+            val itemDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timeStr) ?: return false
+            val diff = Date().time - itemDate.time
+            diff in 0..7 * 24 * 60 * 60 * 1000L
+        } catch (_: Exception) {
+            false
+        }
+    }
+    private fun isWithinMonth(timeStr: String): Boolean {
+        return try {
+            val itemDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timeStr) ?: return false
+            val diff = Date().time - itemDate.time
+            diff in 0..30L * 24 * 60 * 60 * 1000L
+        } catch (_: Exception) {
+            false
+        }
+    }
+    private fun loadHistory() {
+        allItems = HistoryRepository.loadAll(requireContext())
+        applyFilters()
+        binding.listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
+            hideKeyboard()
+            val item = filteredItems[position]
+            if (multiSelectMode) {
+                if (selectedItems.contains(item)) selectedItems.remove(item) else selectedItems.add(item)
+                Toast.makeText(requireContext(), getString(R.string.selected_count, selectedItems.size), Toast.LENGTH_SHORT).show()
+            } else {
+                openResult(item)
+            }
+        }
+        binding.listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
+            val item = filteredItems[position]
+            if (multiSelectMode) {
+                if (selectedItems.contains(item)) selectedItems.remove(item) else selectedItems.add(item)
+                true
+            } else {
+                AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.delete_record)
+                    .setMessage(R.string.delete_record_confirm)
+                    .setPositiveButton(R.string.delete) { _, _ ->
+                        HistoryRepository.deleteEntry(requireContext(), item)
+                        loadHistory()
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+                true
+            }
+        }
+    }
+    private fun openResult(item: HistoryItem) {
+        val intent = Intent(requireContext(), ResultActivity::class.java)
+        intent.putExtra("category", item.category)
+        intent.putExtra("confidence", item.confidence)
+        intent.putExtra("description", getString(R.string.history_record))
+        if (!item.imagePath.isNullOrBlank()) intent.putExtra("imagePath", item.imagePath)
+        intent.putExtra("fromHistory", true)
+        startActivity(intent)
+        activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+    }
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+    companion object {
+        private const val ARG_CATEGORY_FILTER = "category_filter"
+        fun newInstance(categoryFilter: String? = null): HistoryFragment {
+            return HistoryFragment().apply {
+                arguments = Bundle().apply {
+                    categoryFilter?.let { putString(ARG_CATEGORY_FILTER, it) }
+                }
+            }
+        }
+    }
+}
+// ===== HistoryAdapter.kt =====
+package com.deepfashion.classifier
+import android.content.Context
+import android.graphics.BitmapFactory
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.TextView
+import android.widget.LinearLayout
+import androidx.palette.graphics.Palette
+class HistoryAdapter(
+    private val context: Context,
+    private var items: List<HistoryItem>
+) : BaseAdapter() {
+    fun update(newItems: List<HistoryItem>) {
+        items = newItems
+        notifyDataSetChanged()
+    }
+    override fun getCount(): Int = items.size
+    override fun getItem(position: Int): Any = items[position]
+    override fun getItemId(position: Int): Long = position.toLong()
+    override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+        val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.item_history, parent, false)
+        val img = view.findViewById<ImageView>(R.id.imgThumb)
+        val tvTitle = view.findViewById<TextView>(R.id.tvTitle)
+        val tvSubtitle = view.findViewById<TextView>(R.id.tvSubtitle)
+        val paletteBar = view.findViewById<LinearLayout>(R.id.paletteBar)
+        val item = items[position]
+        tvTitle.text = "${item.category} · ${(item.confidence * 100).toInt()}%"
+        tvSubtitle.text = item.time
+        // decode thumbnail with sampling to avoid OOM
+        if (!item.imagePath.isNullOrBlank()) {
+            try {
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(item.imagePath, opts)
+                var sample = 1
+                val target = 112 // ~2x of 56dp for quality
+                while (opts.outWidth / sample > target || opts.outHeight / sample > target) {
+                    sample *= 2
+                }
+                val opts2 = BitmapFactory.Options().apply { inSampleSize = sample }
+                val bmp = BitmapFactory.decodeFile(item.imagePath, opts2)
+                img.setImageBitmap(bmp)
+                // build palette bar
+                if (bmp != null) {
+                    Palette.from(bmp).clearFilters().generate { pal ->
+                        paletteBar?.let { bar ->
+                            bar.removeAllViews()
+                            val colors = mutableListOf<Int>()
+                            fun add(c: Int?) { if (c != null && c != 0 && !colors.contains(c)) colors.add(c) }
+                            add(pal?.vibrantSwatch?.rgb)
+                            add(pal?.lightVibrantSwatch?.rgb)
+                            add(pal?.darkVibrantSwatch?.rgb)
+                            add(pal?.mutedSwatch?.rgb)
+                            add(pal?.lightMutedSwatch?.rgb)
+                            add(pal?.darkMutedSwatch?.rgb)
+                            add(pal?.dominantSwatch?.rgb)
+                            if (colors.isEmpty()) {
+                                bar.visibility = View.GONE
+                            } else {
+                                bar.visibility = View.VISIBLE
+                                colors.forEach { color ->
+                                    val v = View(context)
+                                    v.setBackgroundColor(color)
+                                    val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT)
+                                    lp.weight = 1f
+                                    lp.marginEnd = 2
+                                    v.layoutParams = lp
+                                    bar.addView(v)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    paletteBar?.visibility = View.GONE
+                }
+            } catch (_: Exception) {
+                img.setImageDrawable(null)
+                paletteBar?.visibility = View.GONE
+            }
+        } else {
+            img.setImageDrawable(null)
+            paletteBar?.visibility = View.GONE
+        }
+        return view
+    }
+}
+// ===== StatisticsRepository.kt =====
+package com.deepfashion.classifier
+import android.content.Context
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+data class StatisticsSummary(
+    val totalCount: Int,
+    val weekCount: Int,
+    val avgConfidence: Float,
+    val topCategory: String?,
+    val topCategoryCount: Int,
+    val favoriteCount: Int
+)
+data class DailyCount(val dateLabel: String, val count: Int)
+data class CategoryCount(val category: String, val count: Int)
+object StatisticsRepository {
+    fun getSummary(context: Context): StatisticsSummary {
+        val items = HistoryRepository.loadAll(context, limit = Int.MAX_VALUE)
+        if (items.isEmpty()) {
+            return StatisticsSummary(0, 0, 0f, null, 0, 0)
+        }
+        val weekItems = items.filter { isWithinWeek(it.time) }
+        val avgConf = items.map { it.confidence }.average().toFloat()
+        val categoryCounts = getCategoryCounts(context)
+        val top = categoryCounts.maxByOrNull { it.count }
+        return StatisticsSummary(
+            totalCount = items.size,
+            weekCount = weekItems.size,
+            avgConfidence = avgConf,
+            topCategory = top?.category,
+            topCategoryCount = top?.count ?: 0,
+            favoriteCount = items.count { it.isFavorite }
+        )
+    }
+    fun getCategoryCounts(context: Context): List<CategoryCount> {
+        val items = HistoryRepository.loadAll(context, limit = Int.MAX_VALUE)
+        return items.groupBy { it.category }
+            .map { (cat, list) -> CategoryCount(cat, list.size) }
+            .sortedByDescending { it.count }
+    }
+    fun getDailyCounts(context: Context, days: Int): List<DailyCount> {
+        val items = HistoryRepository.loadAll(context, limit = Int.MAX_VALUE)
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val labelSdf = SimpleDateFormat("MM/dd", Locale.getDefault())
+        val cal = Calendar.getInstance()
+        val result = mutableListOf<DailyCount>()
+        for (i in days - 1 downTo 0) {
+            cal.time = Date()
+            cal.add(Calendar.DAY_OF_YEAR, -i)
+            val dayStr = sdf.format(cal.time)
+            val label = labelSdf.format(cal.time)
+            val count = items.count { item ->
+                try {
+                    val itemDay = sdf.format(
+                        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(item.time) ?: Date()
+                    )
+                    itemDay == dayStr
+                } catch (_: Exception) {
+                    false
+                }
+            }
+            result.add(DailyCount(label, count))
+        }
+        return result
+    }
+    fun countForCategory(context: Context, categoryDisplay: String): Int {
+        val items = HistoryRepository.loadAll(context, limit = Int.MAX_VALUE)
+        return items.count { it.category == categoryDisplay }
+    }
+    fun getStorageSizeBytes(context: Context): Long {
+        var size = 0L
+        val historyFile = File(context.filesDir, "history.jsonl")
+        if (historyFile.exists()) size += historyFile.length()
+        val imagesDir = File(context.filesDir, "images")
+        if (imagesDir.exists()) {
+            imagesDir.walkTopDown().filter { it.isFile }.forEach { size += it.length() }
+        }
+        return size
+    }
+    fun formatSize(bytes: Long): String {
+        return when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> String.format(Locale.getDefault(), "%.1f KB", bytes / 1024.0)
+            else -> String.format(Locale.getDefault(), "%.1f MB", bytes / (1024.0 * 1024.0))
+        }
+    }
+    private fun isWithinWeek(timeStr: String): Boolean {
+        return try {
+            val itemDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timeStr) ?: return false
+            val now = Date()
+            val diff = now.time - itemDate.time
+            diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000L
+        } catch (_: Exception) {
+            false
+        }
+    }
+}
+// ===== StatisticsActivity.kt =====
+package com.deepfashion.classifier
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+import com.deepfashion.classifier.databinding.ActivityStatisticsBinding
+class StatisticsActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityStatisticsBinding
+    private var trendDays = 7
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityStatisticsBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        title = getString(R.string.statistics)
+        val summary = StatisticsRepository.getSummary(this)
+        binding.tvTotalCount.text = getString(R.string.stat_total, summary.totalCount)
+        binding.tvWeekCount.text = getString(R.string.stat_week, summary.weekCount)
+        binding.tvAvgConfidence.text = getString(R.string.stat_avg_confidence, (summary.avgConfidence * 100).toInt())
+        val categoryCounts = StatisticsRepository.getCategoryCounts(this)
+        val least = categoryCounts.minByOrNull { it.count }
+        binding.tvLeastCategory.text = if (least != null && least.count > 0) {
+            getString(R.string.stat_least_category, least.category, least.count)
+        } else {
+            getString(R.string.home_no_history)
+        }
+        refreshTrendChart()
+        refreshPieChart(categoryCounts)
+        binding.chip7Days.setOnClickListener { selectTrendDays(7) }
+        binding.chip30Days.setOnClickListener { selectTrendDays(30) }
+    }
+    private fun selectTrendDays(days: Int) {
+        trendDays = days
+        binding.chip7Days.isChecked = days == 7
+        binding.chip30Days.isChecked = days == 30
+        binding.tvTrendTitle.text = if (days == 7) getString(R.string.trend_7_days) else getString(R.string.trend_30_days)
+        refreshTrendChart()
+    }
+    private fun refreshTrendChart() {
+        val daily = StatisticsRepository.getDailyCounts(this, trendDays)
+        binding.chartTrend.setData(daily.map { it.dateLabel }, daily.map { it.count })
+    }
+    private fun refreshPieChart(categoryCounts: List<CategoryCount>) {
+        val top = categoryCounts.take(6)
+        val otherCount = categoryCounts.drop(6).sumOf { it.count }
+        val labels = top.map { it.category.take(8) }.toMutableList()
+        val values = top.map { it.count }.toMutableList()
+        if (otherCount > 0) {
+            labels.add(getString(R.string.other_categories))
+            values.add(otherCount)
+        }
+        binding.chartCategories.setData(labels, values)
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== SimpleBarChartView.kt =====
+package com.deepfashion.classifier
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.util.AttributeSet
+import android.view.View
+import androidx.core.content.ContextCompat
+class SimpleBarChartView @JvmOverloads constructor(
+    context: Context, attrs: AttributeSet? = null
+) : View(context, attrs) {
+    private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ContextCompat.getColor(context, com.google.android.material.R.color.design_default_color_primary)
+    }
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ContextCompat.getColor(context, android.R.color.darker_gray)
+        textSize = 24f
+    }
+    private var labels: List<String> = emptyList()
+    private var values: List<Float> = emptyList()
+    fun setData(labels: List<String>, values: List<Int>) {
+        this.labels = labels
+        this.values = values.map { it.toFloat() }
+        invalidate()
+    }
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (values.isEmpty()) return
+        val max = values.maxOrNull()?.coerceAtLeast(1f) ?: 1f
+        val barWidth = width.toFloat() / values.size * 0.6f
+        val gap = width.toFloat() / values.size * 0.4f
+        values.forEachIndexed { i, v ->
+            val left = i * (barWidth + gap) + gap / 2
+            val barHeight = (height - 40) * (v / max)
+            val top = height - 30 - barHeight
+            canvas.drawRect(left, top, left + barWidth, height - 30f, barPaint)
+            if (i < labels.size) {
+                canvas.drawText(labels[i], left, height - 8f, textPaint)
+            }
+        }
+    }
+}
+// ===== SimplePieChartView.kt =====
+package com.deepfashion.classifier
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.util.AttributeSet
+import android.view.View
+import androidx.core.content.ContextCompat
+import kotlin.math.min
+class SimplePieChartView @JvmOverloads constructor(
+    context: Context, attrs: AttributeSet? = null
+) : View(context, attrs) {
+    private data class Slice(val label: String, val value: Float, val color: Int)
+    private val slices = mutableListOf<Slice>()
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ContextCompat.getColor(context, android.R.color.darker_gray)
+        textSize = 28f
+    }
+    private val colors = intArrayOf(
+        0xFF6200EE.toInt(), 0xFF03DAC5.toInt(), 0xFF018786.toInt(),
+        0xFFBB86FC.toInt(), 0xFFCF6679.toInt(), 0xFF3700B3.toInt(),
+        0xFF757575.toInt()
+    )
+    fun setData(labels: List<String>, values: List<Int>) {
+        slices.clear()
+        val total = values.sum().coerceAtLeast(1)
+        labels.zip(values).forEachIndexed { i, (label, value) ->
+            slices.add(Slice(label, value.toFloat() / total, colors[i % colors.size]))
+        }
+        invalidate()
+    }
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (slices.isEmpty()) return
+        val size = min(width, height).toFloat() * 0.85f
+        val left = (width - size) / 2f
+        val top = 16f
+        val oval = RectF(left, top, left + size, top + size)
+        var start = -90f
+        slices.forEach { slice ->
+            val sweep = slice.value * 360f
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = slice.color }
+            canvas.drawArc(oval, start, sweep, true, paint)
+            start += sweep
+        }
+        var legendY = top + size + 24f
+        slices.forEach { slice ->
+            val pct = (slice.value * 100).toInt()
+            canvas.drawText("${slice.label} ($pct%)", 16f, legendY, textPaint)
+            legendY += 36f
+        }
+    }
+}
+// ===== ExportHelper.kt =====
+package com.deepfashion.classifier
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.widget.Toast
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+object ExportHelper {
+    fun exportAllJsonl(context: Context): Boolean {
+        val content = HistoryRepository.exportJsonl(context)
+        if (content.isBlank()) {
+            Toast.makeText(context, R.string.no_data_to_export, Toast.LENGTH_SHORT).show()
+            return false
+        }
+        return saveToDownloads(context, "history_export.jsonl", content, "application/json")
+    }
+    fun exportAllCsv(context: Context): Boolean {
+        val content = HistoryRepository.exportCsv(context)
+        if (content.lines().size <= 1) {
+            Toast.makeText(context, R.string.no_data_to_export, Toast.LENGTH_SHORT).show()
+            return false
+        }
+        return saveToDownloads(context, "history_export.csv", content, "text/csv")
+    }
+    fun exportZipBackup(context: Context): Boolean {
+        val jsonl = HistoryRepository.exportJsonl(context)
+        if (jsonl.isBlank()) {
+            Toast.makeText(context, R.string.no_data_to_export, Toast.LENGTH_SHORT).show()
+            return false
+        }
+        return try {
+            val cacheFile = File(context.cacheDir, "backup_${System.currentTimeMillis()}.zip")
+            ZipOutputStream(FileOutputStream(cacheFile)).use { zos ->
+                zos.putNextEntry(ZipEntry("history.jsonl"))
+                zos.write(jsonl.toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
+                val imagesDir = File(context.filesDir, "images")
+                if (imagesDir.exists()) {
+                    imagesDir.listFiles()?.forEach { img ->
+                        if (img.isFile) {
+                            zos.putNextEntry(ZipEntry("images/${img.name}"))
+                            FileInputStream(img).use { it.copyTo(zos) }
+                            zos.closeEntry()
+                        }
+                    }
+                }
+            }
+            val bytes = cacheFile.readBytes()
+            cacheFile.delete()
+            saveBytesToDownloads(context, "deepfashion_backup.zip", bytes, "application/zip")
+        } catch (_: Exception) {
+            Toast.makeText(context, R.string.export_failed, Toast.LENGTH_SHORT).show()
+            false
+        }
+    }
+    fun importFromUri(context: Context, uri: Uri, replace: Boolean): Boolean {
+        return try {
+            val name = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else null
+            } ?: ""
+            val input = context.contentResolver.openInputStream(uri) ?: return false
+            if (name.endsWith(".zip", ignoreCase = true)) {
+                importZip(context, input, replace)
+            } else {
+                val content = input.bufferedReader(Charsets.UTF_8).readText()
+                val count = if (replace) {
+                    HistoryRepository.replaceFromJsonl(context, content)
+                } else {
+                    HistoryRepository.mergeFromJsonl(context, content)
+                }
+                count > 0
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+    private fun importZip(context: Context, input: java.io.InputStream, replace: Boolean): Boolean {
+        if (replace) HistoryRepository.clearAll(context)
+        var jsonlContent = StringBuilder()
+        val imagesDir = File(context.filesDir, "images")
+        if (!imagesDir.exists()) imagesDir.mkdirs()
+        ZipInputStream(input).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                if (entry.name == "history.jsonl" || entry.name.endsWith("history.jsonl")) {
+                    jsonlContent = StringBuilder(zis.readBytes().toString(Charsets.UTF_8))
+                } else if (entry.name.startsWith("images/") && !entry.isDirectory) {
+                    val outFile = File(imagesDir, File(entry.name).name)
+                    FileOutputStream(outFile).use { zis.copyTo(it) }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
+        }
+        if (jsonlContent.isEmpty()) return false
+        val count = if (replace) {
+            HistoryRepository.replaceFromJsonl(context, jsonlContent.toString())
+        } else {
+            HistoryRepository.mergeFromJsonl(context, jsonlContent.toString())
+        }
+        return count > 0
+    }
+    fun exportSelected(context: Context, items: List<HistoryItem>): Boolean {
+        val sb = StringBuilder("time,category,confidence,imagePath,isFavorite\n")
+        items.forEach { item ->
+            sb.append("\"${item.time}\",\"${item.category}\",${item.confidence},\"${item.imagePath ?: ""}\",${item.isFavorite}\n")
+        }
+        return saveToDownloads(context, "history_selected.csv", sb.toString(), "text/csv")
+    }
+    private fun saveToDownloads(context: Context, fileName: String, content: String, mimeType: String): Boolean {
+        return saveBytesToDownloads(context, fileName, content.toByteArray(Charsets.UTF_8), mimeType)
+    }
+    private fun saveBytesToDownloads(context: Context, fileName: String, bytes: ByteArray, mimeType: String): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    values.clear()
+                    values.put(MediaStore.Downloads.IS_PENDING, 0)
+                    context.contentResolver.update(uri, values, null, null)
+                    Toast.makeText(context, R.string.export_success, Toast.LENGTH_SHORT).show()
+                    true
+                } else false
+            } else {
+                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!dir.exists()) dir.mkdirs()
+                val file = File(dir, fileName)
+                FileOutputStream(file).use { it.write(bytes) }
+                val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                intent.data = Uri.fromFile(file)
+                context.sendBroadcast(intent)
+                Toast.makeText(context, R.string.export_success, Toast.LENGTH_SHORT).show()
+                true
+            }
+        } catch (_: Exception) {
+            Toast.makeText(context, R.string.export_failed, Toast.LENGTH_SHORT).show()
+            false
+        }
+    }
+}
+// ===== ExportActivity.kt =====
+package com.deepfashion.classifier
+import android.net.Uri
+import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import com.deepfashion.classifier.databinding.ActivityExportBinding
+class ExportActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityExportBinding
+    private val importLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri ?: return@registerForActivityResult
+        AlertDialog.Builder(this)
+            .setTitle(R.string.import_mode_title)
+            .setItems(arrayOf(getString(R.string.import_merge), getString(R.string.import_replace))) { _, which ->
+                val replace = which == 1
+                val ok = ExportHelper.importFromUri(this, uri, replace)
+                android.widget.Toast.makeText(
+                    this,
+                    if (ok) R.string.import_success else R.string.import_failed,
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                if (ok) refresh()
+            }
+            .show()
+    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityExportBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        title = getString(R.string.export_data)
+        refresh()
+        binding.btnExportJsonl.setOnClickListener { ExportHelper.exportAllJsonl(this) }
+        binding.btnExportCsv.setOnClickListener { ExportHelper.exportAllCsv(this) }
+        binding.btnExportZip.setOnClickListener { ExportHelper.exportZipBackup(this) }
+        binding.btnImportBackup.setOnClickListener {
+            importLauncher.launch(arrayOf("application/json", "application/zip", "text/*", "*/*"))
+        }
+        binding.btnClearAll.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.clear_history_title)
+                .setMessage(R.string.clear_history_message)
+                .setPositiveButton(R.string.clear) { _, _ ->
+                    HistoryRepository.clearAll(this)
+                    refresh()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+    private fun refresh() {
+        val size = StatisticsRepository.getStorageSizeBytes(this)
+        val count = HistoryRepository.loadAll(this, limit = Int.MAX_VALUE).size
+        binding.tvStorageSize.text = getString(R.string.storage_size, StatisticsRepository.formatSize(size))
+        binding.tvRecordCount.text = getString(R.string.record_count, count)
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== CompareActivity.kt =====
+package com.deepfashion.classifier
+import android.graphics.BitmapFactory
+import android.os.Bundle
+import android.view.View
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import com.deepfashion.classifier.databinding.ActivityCompareBinding
+class CompareActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityCompareBinding
+    private var first: HistoryItem? = null
+    private var second: HistoryItem? = null
+    private val allItems by lazy { HistoryRepository.loadAll(this) }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityCompareBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        title = getString(R.string.compare)
+        binding.btnPickFirst.setOnClickListener { pickRecord(true) }
+        binding.btnPickSecond.setOnClickListener { pickRecord(false) }
+        binding.btnGenerateLongImage.setOnClickListener { generateLongImage() }
+    }
+    private fun pickRecord(isFirst: Boolean) {
+        if (allItems.isEmpty()) {
+            Toast.makeText(this, R.string.home_no_history, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = allItems.map { "${it.category} · ${it.time}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(if (isFirst) R.string.pick_first_record else R.string.pick_second_record)
+            .setItems(labels) { _, which ->
+                val item = allItems[which]
+                if (isFirst) {
+                    first = item
+                    showItem(binding.tvFirst, binding.imgFirst, binding.tvFirstDesc, item)
+                } else {
+                    second = item
+                    showItem(binding.tvSecond, binding.imgSecond, binding.tvSecondDesc, item)
+                }
+                updateSummary()
+            }
+            .show()
+    }
+    private fun showItem(
+        tv: android.widget.TextView,
+        img: android.widget.ImageView,
+        descTv: android.widget.TextView,
+        item: HistoryItem
+    ) {
+        tv.text = "${item.category}\n${(item.confidence * 100).toInt()}%\n${item.time}"
+        if (!item.imagePath.isNullOrBlank()) {
+            img.setImageBitmap(BitmapFactory.decodeFile(item.imagePath))
+        }
+        val isZh = resources.configuration.locales[0].language.startsWith("zh")
+        val categoryEn = CategoryRepository.getEnglishName(item.category) ?: item.category
+        descTv.text = CategoryRepository.getDescription(categoryEn, isZh)
+    }
+    private fun updateSummary() {
+        val a = first
+        val b = second
+        if (a == null || b == null) {
+            binding.tvCompareSummary.visibility = View.GONE
+            binding.btnGenerateLongImage.visibility = View.GONE
+            return
+        }
+        binding.tvCompareSummary.visibility = View.VISIBLE
+        val sameCategory = a.category == b.category
+        val diffPct = ((b.confidence - a.confidence) * 100).toInt()
+        val diffStr = when {
+            diffPct > 0 -> "+$diffPct%"
+            diffPct < 0 -> "$diffPct%"
+            else -> "0%"
+        }
+        val categoryMsg = if (sameCategory) {
+            getString(R.string.compare_same_category)
+        } else {
+            "${a.category} vs ${b.category}"
+        }
+        binding.tvCompareSummary.text = "$categoryMsg\n${getString(R.string.compare_confidence_diff, diffStr)}"
+        binding.btnGenerateLongImage.visibility = View.VISIBLE
+    }
+    private fun generateLongImage() {
+        val a = first ?: return
+        val b = second ?: return
+        val isZh = resources.configuration.locales[0].language.startsWith("zh")
+        val descA = CategoryRepository.getDescription(CategoryRepository.getEnglishName(a.category) ?: a.category, isZh)
+        val descB = CategoryRepository.getDescription(CategoryRepository.getEnglishName(b.category) ?: b.category, isZh)
+        val bitmap = ShareImageHelper.stitchCompareLongImage(this, a, b, descA, descB) ?: run {
+            Toast.makeText(this, R.string.image_load_failed, Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val cacheDir = java.io.File(cacheDir, "share")
+            cacheDir.mkdirs()
+            val tempFile = java.io.File(cacheDir, "compare_${System.currentTimeMillis()}.png")
+            tempFile.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            bitmap.recycle()
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this, "${applicationContext.packageName}.fileprovider", tempFile
+            )
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(android.content.Intent.createChooser(intent, getString(R.string.long_image_share)))
+        } catch (_: Exception) {
+            Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== FavoritesActivity.kt =====
+package com.deepfashion.classifier
+import android.content.Intent
+import android.os.Bundle
+import android.widget.AdapterView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.deepfashion.classifier.databinding.ActivityFavoritesBinding
+class FavoritesActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityFavoritesBinding
+    private lateinit var adapter: HistoryAdapter
+    private var items: List<HistoryItem> = emptyList()
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityFavoritesBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        title = getString(R.string.favorites)
+        items = HistoryRepository.loadAll(this).filter { it.isFavorite }
+        adapter = HistoryAdapter(this, items)
+        binding.listFavorites.adapter = adapter
+        if (items.isEmpty()) {
+            Toast.makeText(this, R.string.no_favorites, Toast.LENGTH_SHORT).show()
+        }
+        binding.listFavorites.onItemClickListener = AdapterView.OnItemClickListener { _, _, pos, _ ->
+            val item = items[pos]
+            val intent = Intent(this, ResultActivity::class.java)
+            intent.putExtra("category", item.category)
+            intent.putExtra("confidence", item.confidence)
+            intent.putExtra("description", getString(R.string.history_record))
+            if (!item.imagePath.isNullOrBlank()) intent.putExtra("imagePath", item.imagePath)
+            intent.putExtra("fromHistory", true)
+            startActivity(intent)
+            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+    }
+    override fun onResume() {
+        super.onResume()
+        items = HistoryRepository.loadAll(this).filter { it.isFavorite }
+        adapter.update(items)
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== MoreFragment.kt =====
+package com.deepfashion.classifier
+import android.content.Intent
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.fragment.app.Fragment
+import com.deepfashion.classifier.databinding.FragmentMoreBinding
+class MoreFragment : Fragment() {
+    private var _binding: FragmentMoreBinding? = null
+    private val binding get() = _binding!!
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        _binding = FragmentMoreBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        val ctx = requireContext()
+        binding.cardStatistics.setOnClickListener {
+            startActivity(Intent(ctx, StatisticsActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        binding.cardFavorites.setOnClickListener {
+            startActivity(Intent(ctx, FavoritesActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        binding.cardCompare.setOnClickListener {
+            startActivity(Intent(ctx, CompareActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        binding.cardExport.setOnClickListener {
+            startActivity(Intent(ctx, ExportActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        binding.cardCrashLogs.setOnClickListener {
+            startActivity(Intent(ctx, LogViewerActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        binding.cardHelp.setOnClickListener {
+            startActivity(Intent(ctx, HelpCenterActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        binding.cardChangelog.setOnClickListener {
+            startActivity(Intent(ctx, ChangelogActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        binding.cardModelInfo.setOnClickListener {
+            startActivity(Intent(ctx, ModelInfoActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        binding.cardSettings.setOnClickListener {
+            startActivity(Intent(ctx, SettingsActivity::class.java))
+            activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        binding.cardDemoData.setOnClickListener { showDemoDataDialog() }
+    }
+    private fun showDemoDataDialog() {
+        val ctx = requireContext()
+        val hasDemo = DemoDataSeeder.hasDemoData(ctx)
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.demo_data)
+            .setMessage(
+                if (hasDemo) getString(R.string.demo_data_has_data)
+                else getString(R.string.demo_data_message)
+            )
+            .setPositiveButton(R.string.demo_data_load) { _, _ ->
+                Thread {
+                    val count = DemoDataSeeder.seed(ctx, replace = false)
+                    activity?.runOnUiThread {
+                        val msg = if (count > 0) {
+                            getString(R.string.demo_data_loaded, count)
+                        } else {
+                            getString(R.string.demo_data_already)
+                        }
+                        Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+                    }
+                }.start()
+            }
+            .setNeutralButton(R.string.demo_data_replace) { _, _ ->
+                Thread {
+                    val count = DemoDataSeeder.seed(ctx, replace = true)
+                    activity?.runOnUiThread {
+                        Toast.makeText(ctx, getString(R.string.demo_data_loaded, count), Toast.LENGTH_SHORT).show()
+                    }
+                }.start()
+            }
+            .apply {
+                if (hasDemo) {
+                    setNegativeButton(R.string.demo_data_clear) { _, _ ->
+                        Thread {
+                            val removed = DemoDataSeeder.clearDemo(ctx)
+                            androidx.preference.PreferenceManager.getDefaultSharedPreferences(ctx).edit()
+                                .putBoolean("pref_demo_data_seeded", false)
+                                .apply()
+                            activity?.runOnUiThread {
+                                Toast.makeText(
+                                    ctx,
+                                    getString(R.string.demo_data_cleared, removed),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }.start()
+                    }
+                } else {
+                    setNegativeButton(android.R.string.cancel, null)
+                }
+            }
+            .show()
+    }
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+}
+// ===== SettingsActivity.kt =====
+package com.deepfashion.classifier
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+import androidx.preference.ListPreference
+import androidx.preference.Preference
+import androidx.preference.PreferenceFragmentCompat
+import androidx.appcompat.app.AppCompatDelegate
+class SettingsActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        supportFragmentManager
+            .beginTransaction()
+            .replace(android.R.id.content, SettingsFragment())
+            .commit()
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.title = getString(R.string.settings)
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun onBackPressed() {
+        super.onBackPressed()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+class SettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        setPreferencesFromResource(R.xml.root_preferences, rootKey)
+        // 语言切换即时生效：去除“下次启动”提示
+        findPreference<ListPreference>("pref_language")?.onPreferenceChangeListener =
+            Preference.OnPreferenceChangeListener { _, _ ->
+                // 立即更新全局语言
+                activity?.recreate()
+                true
+            }
+        // 性能优先即时生效：由分类器按需重建 session
+        findPreference<Preference>("pref_performance_threads")?.onPreferenceChangeListener =
+            Preference.OnPreferenceChangeListener { _, _ -> true }
+        // 主题切换：跟随系统 / 浅色 / 深色
+        findPreference<ListPreference>("pref_theme_mode")?.onPreferenceChangeListener =
+            Preference.OnPreferenceChangeListener { _, newValue ->
+                when (newValue as String) {
+                    "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                    "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                    else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+                }
+                activity?.recreate()
+                true
+            }
+    }
+}
+// ===== CrashHandler.kt =====
+package com.deepfashion.classifier
+import android.content.Context
+import android.os.Build
+import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+class CrashHandler(
+    private val context: Context,
+    private val defaultHandler: Thread.UncaughtExceptionHandler?
+) : Thread.UncaughtExceptionHandler {
+    override fun uncaughtException(thread: Thread, throwable: Throwable) {
+        try {
+            saveCrashLog(thread, throwable)
+        } catch (_: Exception) { }
+        defaultHandler?.uncaughtException(thread, throwable)
+    }
+    private fun saveCrashLog(thread: Thread, throwable: Throwable) {
+        val logsDir = File(context.filesDir, "logs")
+        if (!logsDir.exists()) logsDir.mkdirs()
+        val sdf = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+        val file = File(logsDir, "crash_${sdf.format(Date())}.txt")
+        val sw = StringWriter()
+        throwable.printStackTrace(PrintWriter(sw))
+        val content = buildString {
+            appendLine("=== Crash Report ===")
+            appendLine("Time: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())}")
+            appendLine("Thread: ${thread.name}")
+            appendLine("App: ${context.packageName}")
+            appendLine("Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+            appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
+            appendLine()
+            append(sw.toString())
+        }
+        file.writeText(content, Charsets.UTF_8)
+    }
+    companion object {
+        fun install(context: Context) {
+            val appContext = context.applicationContext
+            val current = Thread.getDefaultUncaughtExceptionHandler()
+            if (current !is CrashHandler) {
+                Thread.setDefaultUncaughtExceptionHandler(CrashHandler(appContext, current))
+            }
+        }
+    }
+}
+// ===== LogViewerActivity.kt =====
+package com.deepfashion.classifier
+import android.content.Intent
+import android.os.Bundle
+import android.widget.ArrayAdapter
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import com.deepfashion.classifier.databinding.ActivityLogViewerBinding
+import java.io.File
+class LogViewerActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityLogViewerBinding
+    private var logFiles: List<File> = emptyList()
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityLogViewerBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        title = getString(R.string.crash_logs)
+        binding.btnClearLogs.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.clear_logs)
+                .setMessage(R.string.clear_history_message)
+                .setPositiveButton(R.string.clear) { _, _ ->
+                    logsDir().listFiles()?.forEach { it.delete() }
+                    refreshList()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+        refreshList()
+    }
+    private fun logsDir(): File {
+        val dir = File(filesDir, "logs")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+    private fun refreshList() {
+        logFiles = logsDir().listFiles()
+            ?.filter { it.isFile }
+            ?.sortedByDescending { it.lastModified() }
+            ?: emptyList()
+        if (logFiles.isEmpty()) {
+            binding.tvEmpty.visibility = android.view.View.VISIBLE
+            binding.listLogs.visibility = android.view.View.GONE
+        } else {
+            binding.tvEmpty.visibility = android.view.View.GONE
+            binding.listLogs.visibility = android.view.View.VISIBLE
+            binding.listLogs.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, logFiles.map { it.name })
+            binding.listLogs.setOnItemClickListener { _, _, position, _ ->
+                val content = logFiles[position].readText(Charsets.UTF_8)
+                AlertDialog.Builder(this)
+                    .setTitle(logFiles[position].name)
+                    .setMessage(content)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .setNegativeButton(R.string.delete_log) { _, _ ->
+                        logFiles[position].delete()
+                        refreshList()
+                    }
+                    .show()
+            }
+        }
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== OnboardingActivity.kt =====
+package com.deepfashion.classifier
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.preference.PreferenceManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
+import com.deepfashion.classifier.databinding.ActivityOnboardingBinding
+import com.deepfashion.classifier.databinding.ItemOnboardingPageBinding
+class OnboardingActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityOnboardingBinding
+    private var page = 0
+    private val pages = listOf(
+        R.string.onboarding_title_1 to R.string.onboarding_desc_1,
+        R.string.onboarding_title_2 to R.string.onboarding_desc_2,
+        R.string.onboarding_title_3 to R.string.onboarding_desc_3,
+        R.string.onboarding_title_4 to R.string.onboarding_desc_4
+    )
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityOnboardingBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        binding.viewPager.adapter = OnboardingAdapter(pages.map { getString(it.first) to getString(it.second) })
+        binding.btnNext.setOnClickListener {
+            if (page < pages.size - 1) {
+                page++
+                binding.viewPager.currentItem = page
+                updateButton()
+            } else {
+                PreferenceManager.getDefaultSharedPreferences(this)
+                    .edit().putBoolean(MainContainerActivity.PREF_ONBOARDING_DONE, true).apply()
+                finish()
+            }
+        }
+        binding.viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                page = position
+                updateButton()
+            }
+        })
+    }
+    private fun updateButton() {
+        binding.btnNext.text = if (page == pages.size - 1) getString(R.string.get_started) else getString(R.string.next)
+    }
+    private class OnboardingAdapter(private val items: List<Pair<String, String>>) :
+        RecyclerView.Adapter<OnboardingAdapter.VH>() {
+        class VH(val binding: ItemOnboardingPageBinding) : RecyclerView.ViewHolder(binding.root)
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            val b = ItemOnboardingPageBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+            return VH(b)
+        }
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            holder.binding.tvOnboardingTitle.text = items[position].first
+            holder.binding.tvOnboardingDesc.text = items[position].second
+        }
+        override fun getItemCount() = items.size
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== LocaleManager.kt =====
+package com.deepfashion.classifier
+import android.content.Context
+import android.content.SharedPreferences
+import android.content.res.Configuration
+import android.os.Build
+import androidx.preference.PreferenceManager
+import java.util.Locale
+object LocaleManager {
+    fun wrap(base: Context): Context {
+        val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(base)
+        val lang = prefs.getString("pref_language", "zh") ?: "zh"
+        val locale = if (lang == "en") Locale.ENGLISH else Locale.CHINA
+        val config = Configuration(base.resources.configuration)
+        config.setLocale(locale)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            base.createConfigurationContext(config)
+        } else {
+            @Suppress("DEPRECATION")
+            base.resources.updateConfiguration(config, base.resources.displayMetrics)
+            base
+        }
+    }
+}
+// ===== HelpCenterActivity.kt =====
+package com.deepfashion.classifier
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+import com.deepfashion.classifier.databinding.ActivityHelpCenterBinding
+class HelpCenterActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val binding = ActivityHelpCenterBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        title = getString(R.string.help_center)
+        binding.tvHelpContent.text = getString(R.string.help_content)
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== ChangelogActivity.kt =====
+package com.deepfashion.classifier
+import android.os.Bundle
+import android.widget.ArrayAdapter
+import androidx.appcompat.app.AppCompatActivity
+import com.deepfashion.classifier.databinding.ActivityChangelogBinding
+class ChangelogActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val binding = ActivityChangelogBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        title = getString(R.string.changelog)
+        val entries = resources.getStringArray(R.array.changelog_entries).toList()
+        binding.listChangelog.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, entries)
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== ModelInfoActivity.kt =====
+package com.deepfashion.classifier
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+import com.deepfashion.classifier.databinding.ActivityModelInfoBinding
+class ModelInfoActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val binding = ActivityModelInfoBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        title = getString(R.string.model_info)
+        binding.tvModelInfo.text = getString(
+            R.string.model_info_content,
+            "1.2",
+            "50",
+            "61.55",
+            "224",
+            ClassifierProvider.get(this).getThreadCount().toString()
+        )
+    }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        return true
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}
+// ===== FullImageActivity.kt =====
+package com.deepfashion.classifier
+import android.graphics.BitmapFactory
+import android.os.Bundle
+import android.view.View
+import android.widget.ImageView
+import androidx.appcompat.app.AppCompatActivity
+class FullImageActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val imageView = ImageView(this)
+        imageView.layoutParams = android.view.ViewGroup.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        imageView.adjustViewBounds = true
+        imageView.scaleType = ImageView.ScaleType.FIT_CENTER
+        imageView.setBackgroundColor(0xFF000000.toInt())
+        imageView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+        setContentView(imageView)
+        val path = intent.getStringExtra("imagePath")
+        if (!path.isNullOrBlank()) {
+            try {
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(path, opts)
+                var sample = 1
+                val target = 1440
+                while (opts.outWidth / sample > target || opts.outHeight / sample > target) {
+                    sample *= 2
+                }
+                val opts2 = BitmapFactory.Options().apply { inSampleSize = sample }
+                val bmp = BitmapFactory.decodeFile(path, opts2)
+                imageView.setImageBitmap(bmp)
+            } catch (_: Exception) { }
+        }
+        imageView.setOnClickListener {
+            finish()
+            overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+        }
+    }
+    override fun onBackPressed() {
+        super.onBackPressed()
+        overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+    }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+}

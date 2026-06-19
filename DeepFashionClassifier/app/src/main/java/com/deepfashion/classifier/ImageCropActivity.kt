@@ -8,7 +8,11 @@ import android.graphics.RectF
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.deepfashion.classifier.databinding.ActivityImageCropBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ImageCropActivity : AppCompatActivity() {
 
@@ -40,7 +44,11 @@ class ImageCropActivity : AppCompatActivity() {
 
         binding.btnRecrop.setOnClickListener {
             val bmp = sourceBitmap ?: return@setOnClickListener
-            val cropped = cropFromOverlay(bmp) ?: return@setOnClickListener
+            val cropped = cropFromOverlay(bmp)
+            if (cropped == null) {
+                Toast.makeText(this, R.string.crop_area_invalid, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             reclassify(cropped)
         }
     }
@@ -96,18 +104,24 @@ class ImageCropActivity : AppCompatActivity() {
     }
 
     private fun reclassify(bitmap: Bitmap) {
-        try {
-            val result = ClassifierProvider.classifyImage(this, bitmap, imagePath)
-            val intent = Intent(this, ResultActivity::class.java)
-            intent.putExtra("category", result.category)
-            intent.putExtra("confidence", result.confidence)
-            intent.putExtra("description", result.description)
-            intent.putExtra("imagePath", imagePath)
-            intent.putExtra("fromHistory", false)
-            startActivity(intent)
-            finish()
-        } catch (_: Exception) {
-            Toast.makeText(this, R.string.classify_failed, Toast.LENGTH_SHORT).show()
+        binding.btnRecrop.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val result = withContext(Dispatchers.Default) {
+                    ClassifierProvider.classifyImage(this@ImageCropActivity, bitmap, imagePath, useCache = false)
+                }
+                val intent = Intent(this@ImageCropActivity, ResultActivity::class.java)
+                intent.putExtra("category", result.category)
+                intent.putExtra("confidence", result.confidence)
+                intent.putExtra("description", result.description)
+                intent.putExtra("imagePath", imagePath)
+                intent.putExtra("fromHistory", false)
+                startActivity(intent)
+                finish()
+            } catch (_: Exception) {
+                binding.btnRecrop.isEnabled = true
+                Toast.makeText(this@ImageCropActivity, R.string.classify_failed, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

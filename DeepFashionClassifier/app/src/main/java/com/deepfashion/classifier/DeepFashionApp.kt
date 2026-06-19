@@ -11,5 +11,8 @@ class DeepFashionApp : Application() {
             .remove("pref_realtime_detection")
             .remove("pref_detection_interval")
             .apply()
+        Thread {
+            DemoDataSeeder.seedIfEmpty(applicationContext)
+        }.start()
     }
 }

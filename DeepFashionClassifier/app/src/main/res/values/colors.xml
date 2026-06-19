@@ -9,4 +9,14 @@
     <color name="white">#FFFFFFFF</color>
     <!-- PreferenceCategory标题颜色：深色以确保足够的对比度 -->
     <color name="preference_category_title">#FF212121</color>
+
+    <!-- Home / Classify screen semantic colors (light theme) -->
+    <color name="home_text_primary">#FF1A1C1E</color>
+    <color name="home_text_secondary">#FF49454F</color>
+    <color name="home_accent">#FF6750A4</color>
+    <color name="home_stat_number">#FF3700B3</color>
+    <color name="home_surface">#FFFFFFFF</color>
+    <color name="home_gradient_start">#FFF3E8FF</color>
+    <color name="home_gradient_end">#FFFAFAFA</color>
+    <color name="history_item_selected">#1A6750A4</color>
 </resources>

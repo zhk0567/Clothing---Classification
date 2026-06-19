@@ -1,100 +1,109 @@
 package com.deepfashion.classifier
 
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.LinearLayout
-import androidx.palette.graphics.Palette
+import androidx.core.content.ContextCompat
+import com.google.android.material.checkbox.MaterialCheckBox
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class HistoryAdapter(
     private val context: Context,
-    private var items: List<HistoryItem>
+    private var items: List<HistoryItem>,
+    private val scope: CoroutineScope
 ) : BaseAdapter() {
+
+    private var multiSelectMode = false
+    private var selectedItems: Set<HistoryItem> = emptySet()
 
     fun update(newItems: List<HistoryItem>) {
         items = newItems
         notifyDataSetChanged()
     }
 
+    fun setSelectionState(enabled: Boolean, selected: Set<HistoryItem>) {
+        multiSelectMode = enabled
+        selectedItems = selected
+        notifyDataSetChanged()
+    }
+
     override fun getCount(): Int = items.size
-    override fun getItem(position: Int): Any = items[position]
+    override fun getItem(position: Int): HistoryItem = items[position]
     override fun getItemId(position: Int): Long = position.toLong()
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
-        val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.item_history, parent, false)
-        val img = view.findViewById<ImageView>(R.id.imgThumb)
-        val tvTitle = view.findViewById<TextView>(R.id.tvTitle)
-        val tvSubtitle = view.findViewById<TextView>(R.id.tvSubtitle)
-        val paletteBar = view.findViewById<LinearLayout>(R.id.paletteBar)
-
-        val item = items[position]
-        tvTitle.text = "${item.category} · ${(item.confidence * 100).toInt()}%"
-        tvSubtitle.text = item.time
-
-        // decode thumbnail with sampling to avoid OOM
-        if (!item.imagePath.isNullOrBlank()) {
-            try {
-                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(item.imagePath, opts)
-                var sample = 1
-                val target = 112 // ~2x of 56dp for quality
-                while (opts.outWidth / sample > target || opts.outHeight / sample > target) {
-                    sample *= 2
-                }
-                val opts2 = BitmapFactory.Options().apply { inSampleSize = sample }
-                val bmp = BitmapFactory.decodeFile(item.imagePath, opts2)
-                img.setImageBitmap(bmp)
-
-                // build palette bar
-                if (bmp != null) {
-                    Palette.from(bmp).clearFilters().generate { pal ->
-                        paletteBar?.let { bar ->
-                            bar.removeAllViews()
-                            val colors = mutableListOf<Int>()
-                            fun add(c: Int?) { if (c != null && c != 0 && !colors.contains(c)) colors.add(c) }
-                            add(pal?.vibrantSwatch?.rgb)
-                            add(pal?.lightVibrantSwatch?.rgb)
-                            add(pal?.darkVibrantSwatch?.rgb)
-                            add(pal?.mutedSwatch?.rgb)
-                            add(pal?.lightMutedSwatch?.rgb)
-                            add(pal?.darkMutedSwatch?.rgb)
-                            add(pal?.dominantSwatch?.rgb)
-                            if (colors.isEmpty()) {
-                                bar.visibility = View.GONE
-                            } else {
-                                bar.visibility = View.VISIBLE
-                                colors.forEach { color ->
-                                    val v = View(context)
-                                    v.setBackgroundColor(color)
-                                    val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT)
-                                    lp.weight = 1f
-                                    lp.marginEnd = 2
-                                    v.layoutParams = lp
-                                    bar.addView(v)
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    paletteBar?.visibility = View.GONE
-                }
-            } catch (_: Exception) {
-                img.setImageDrawable(null)
-                paletteBar?.visibility = View.GONE
-            }
+        val holder: ViewHolder
+        val view: View
+        if (convertView == null) {
+            view = LayoutInflater.from(context).inflate(R.layout.item_history, parent, false)
+            holder = ViewHolder(view)
+            view.tag = holder
         } else {
-            img.setImageDrawable(null)
-            paletteBar?.visibility = View.GONE
+            view = convertView
+            holder = view.tag as ViewHolder
         }
 
+        val item = items[position]
+        val isSelected = selectedItems.contains(item)
+
+        holder.tvTitle.text = "${item.category} · ${(item.confidence * 100).toInt()}%"
+        holder.tvSubtitle.text = item.time
+
+        if (multiSelectMode) {
+            holder.checkSelect.visibility = View.VISIBLE
+            holder.checkSelect.isChecked = isSelected
+            holder.root.setBackgroundColor(
+                ContextCompat.getColor(
+                    context,
+                    if (isSelected) R.color.history_item_selected else android.R.color.transparent
+                )
+            )
+        } else {
+            holder.checkSelect.visibility = View.GONE
+            holder.root.setBackgroundResource(android.R.color.transparent)
+        }
+
+        bindThumbnail(holder.imgThumb, item)
         return view
     }
+
+    private fun bindThumbnail(img: ImageView, item: HistoryItem) {
+        val path = item.imagePath
+        if (path.isNullOrBlank()) {
+            img.tag = null
+            img.setImageDrawable(null)
+            return
+        }
+
+        img.tag = path
+        HistoryThumbnailCache.get(path)?.let {
+            img.setImageBitmap(it)
+            return
+        }
+
+        img.setImageDrawable(null)
+        scope.launch {
+            val bitmap = withContext(Dispatchers.IO) {
+                HistoryThumbnailCache.decodeThumbnail(path)
+            }
+            if (img.tag == path && bitmap != null) {
+                img.setImageBitmap(bitmap)
+            }
+        }
+    }
+
+    private class ViewHolder(view: View) {
+        val root: View = view.findViewById(R.id.itemRoot)
+        val checkSelect: MaterialCheckBox = view.findViewById(R.id.checkSelect)
+        val imgThumb: ImageView = view.findViewById(R.id.imgThumb)
+        val tvTitle: TextView = view.findViewById(R.id.tvTitle)
+        val tvSubtitle: TextView = view.findViewById(R.id.tvSubtitle)
+    }
 }
-
-

@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>服饰识别软件 V1.2 — 文档鉴别材料（用户手册）</title>
+  <style>
+    :root {
+      --primary: #6200ee;
+      --primary-light: #bb86fc;
+      --text: #212121;
+      --muted: #616161;
+      --border: #e0e0e0;
+      --bg: #fafafa;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+      color: var(--text);
+      line-height: 1.75;
+      margin: 0;
+      background: var(--bg);
+    }
+    .doc {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 32px 80px;
+      background: var(--card);
+      box-shadow: 0 0 24px rgba(0,0,0,.06);
+    }
+    h1 { font-size: 1.85rem; color: var(--primary); border-bottom: 3px solid var(--primary-light); padding-bottom: 12px; }
+    h2 { font-size: 1.35rem; margin-top: 2.2em; color: #3700b3; page-break-after: avoid; }
+    h3 { font-size: 1.1rem; margin-top: 1.4em; color: #333; }
+    p { text-align: justify; margin: 0.6em 0; }
+    .cover {
+      text-align: center;
+      padding: 48px 24px 64px;
+      border: 2px solid var(--primary-light);
+      border-radius: 12px;
+      margin-bottom: 48px;
+      page-break-after: always;
+    }
+    .cover img.logo { width: 96px; height: 96px; border-radius: 20px; margin-bottom: 16px; }
+    .cover h1 { border: none; font-size: 2rem; }
+    .meta-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.95rem; }
+    .meta-table th, .meta-table td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; }
+    .meta-table th { background: #f3e8ff; width: 28%; }
+    .toc { background: #f5f5f5; padding: 20px 28px; border-radius: 8px; margin: 24px 0; page-break-after: always; }
+    .toc ol { margin: 0; padding-left: 1.4em; }
+    .toc li { margin: 6px 0; }
+    .toc a { color: var(--primary); text-decoration: none; }
+    .note {
+      background: #fff8e1;
+      border-left: 4px solid #ffc107;
+      padding: 12px 16px;
+      margin: 16px 0;
+      font-size: 0.92rem;
+    }
+    figure.screenshot { margin: 24px 0; page-break-inside: avoid; }
+    figure.screenshot figcaption {
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 10px;
+      font-weight: 600;
+    }
+    figure.screenshot img.real-shot {
+      display: block;
+      max-width: 320px;
+      width: 100%;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    }
+    figure.screenshot img.real-shot.loaded + .phone-mock,
+    figure.screenshot:has(img.real-shot.loaded) .phone-mock {
+      display: none !important;
+    }
+    figure.screenshot img.arch-img {
+      display: block;
+      max-width: 100%;
+      width: 100%;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+    }
+    .phone-mock {
+      max-width: 320px;
+      margin: 0 auto;
+      border: 3px solid #333;
+      border-radius: 28px;
+      overflow: hidden;
+      background: #111;
+      box-shadow: 0 12px 32px rgba(0,0,0,.2);
+    }
+    .phone-mock .status { height: 24px; background: #1a1a1a; }
+    .phone-mock .screen {
+      min-height: 520px;
+      background: linear-gradient(180deg, #e8eaf6 0%, #f5f5f5 100%);
+      padding: 12px;
+      font-size: 13px;
+    }
+    .phone-mock .nav-bar {
+      display: flex;
+      justify-content: space-around;
+      background: #fff;
+      padding: 10px 4px;
+      border-top: 1px solid #ddd;
+      font-size: 11px;
+      color: #666;
+    }
+    .phone-mock .nav-bar span.active { color: var(--primary); font-weight: bold; }
+    .card-m { background: #fff; border-radius: 12px; padding: 12px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .btn-m { background: var(--primary); color: #fff; text-align: center; padding: 10px; border-radius: 8px; margin: 6px 0; font-size: 12px; }
+    .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+    .tag { display: inline-block; background: #e8def8; color: #3700b3; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin: 2px; }
+    ul.feature-list { padding-left: 1.3em; }
+    ul.feature-list li { margin: 4px 0; }
+    table.func-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 16px 0; }
+    table.func-table th, table.func-table td { border: 1px solid var(--border); padding: 8px 10px; }
+    table.func-table th { background: #ede7f6; }
+    .page-break { page-break-before: always; }
+    .arch-diagram {
+      background: #f9f9f9;
+      border: 1px dashed var(--border);
+      padding: 20px;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+    @media print {
+      body { background: #fff; }
+      .doc { box-shadow: none; max-width: 100%; padding: 16px; }
+      .no-print { display: none; }
+      h2 { page-break-before: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <section class="cover" id="cover">
+      <img class="logo" src="images/app-logo.png" alt="应用图标" onerror="this.style.display='none'" />
+      <h1>服饰识别软件</h1>
+      <p style="font-size:1.25rem;color:#555;">用户手册 / 文档鉴别材料</p>
+      <p style="font-size:1.1rem;"><strong>版本号：V1.2</strong></p>
+      <table class="meta-table">
+        <tr><th>软件全称</th><td>服饰识别软件</td></tr>
+        <tr><th>软件简称</th><td>服饰识别</td></tr>
+        <tr><th>版本号</th><td>V1.2（versionCode 3）</td></tr>
+        <tr><th>软件分类</th><td>应用软件 — 移动智能终端 Android 平台</td></tr>
+        <tr><th>包名</th><td>com.deepfashion.classifier</td></tr>
+        <tr><th>著作权人</th><td>（请填写）</td></tr>
+        <tr><th>开发完成日期</th><td>（请填写）</td></tr>
+        <tr><th>文档编制日期</th><td>2026年</td></tr>
+      </table>
+      <p style="color:#888;font-size:0.9rem;">本文档用于软件著作权登记之文档鉴别材料，含功能说明、界面展示与操作步骤。</p>
+    </section>
+
+    <nav class="toc no-print">
+      <h2 style="margin-top:0;border:none;">目录</h2>
+      <ol>
+        <li><a href="#ch1">软件概述</a></li>
+        <li><a href="#ch2">运行环境与权限</a></li>
+        <li><a href="#ch3">系统架构</a></li>
+        <li><a href="#ch4">主界面与导航</a></li>
+        <li><a href="#ch5">服饰识别功能</a></li>
+        <li><a href="#ch6">识别结果与增强</a></li>
+        <li><a href="#ch7">类别百科</a></li>
+        <li><a href="#ch8">历史记录管理</a></li>
+        <li><a href="#ch9">数据统计</a></li>
+        <li><a href="#ch10">对比与分享</a></li>
+        <li><a href="#ch11">数据导出与本地备份</a></li>
+        <li><a href="#ch12">更多工具与设置</a></li>
+        <li><a href="#ch13">首次引导与帮助</a></li>
+        <li><a href="#ch14">界面清单附录</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="ch1">第一章 软件概述</h2>
+    <h3>1.1 开发目的</h3>
+    <p>「服饰识别」是一款面向移动智能终端的离线服饰图像分类应用软件。用户通过拍照或从相册选取衣物图片，软件在本地调用深度学习模型完成 50 类服饰类别的识别，并给出类别名称、置信度及百科说明，适用于服装整理、电商辅助标注、教学演示等场景。</p>
+    <h3>1.2 主要特点</h3>
+    <ul class="feature-list">
+      <li><strong>完全离线推理</strong>：基于 ONNX Runtime 在端侧运行 ResNet18 分类模型，无需联网即可识别。</li>
+      <li><strong>50 类 DeepFashion 类别</strong>：覆盖上衣、下装、连衣裙等常见服饰细分类别。</li>
+      <li><strong>Material Design 3 界面</strong>：底部五 Tab 导航，支持中英文与深浅色主题。</li>
+      <li><strong>识别增强链路</strong>：支持裁剪重识别、亮度/对比度/锐化增强后重识别、批量识别与连拍模式。</li>
+      <li><strong>数据闭环</strong>：历史记录、收藏、筛选、统计图表、对比、本地 ZIP/JSONL 备份与恢复。</li>
+    </ul>
+    <h3>1.3 版本说明（V1.2）</h3>
+    <p>V1.2 在 V1.1 主框架基础上新增：相机连拍（3/5/8 张）及拍摄分辨率设置；分享图片水印与对比长图拼接；推理单例与 LRU 缓存、协程异步分类；崩溃日志查看；本地 ZIP 备份导入/导出；无障碍描述与 UI 冒烟测试等。</p>
+
+    <h2 id="ch2" class="page-break">第二章 运行环境与权限</h2>
+    <table class="meta-table">
+      <tr><th>操作系统</th><td>Android 7.0（API 24）及以上</td></tr>
+      <tr><th>目标 SDK</th><td>Android 14（API 34）</td></tr>
+      <tr><th>处理器架构</th><td>arm64-v8a、armeabi-v7a</td></tr>
+      <tr><th>存储空间</th><td>建议 80MB 以上（含 ONNX 模型）</td></tr>
+      <tr><th>硬件要求</th><td>后置/前置摄像头（拍照识别）</td></tr>
+    </table>
+    <h3>2.1 权限说明</h3>
+    <table class="func-table">
+      <tr><th>权限</th><th>用途</th></tr>
+      <tr><td>相机</td><td>拍摄衣物照片进行识别</td></tr>
+      <tr><td>读取图片/存储</td><td>从相册选图、导出备份文件到下载目录</td></tr>
+    </table>
+    <p>若用户拒绝相机权限，应用通过 Snackbar 提示并可跳转系统设置页授权。</p>
+
+    <h2 id="ch3">第三章 系统架构</h2>
+    <p>软件采用 Android 原生 Kotlin 开发，主界面为 <code>MainContainerActivity</code>，内嵌五个 Fragment；各功能模块以 Activity 形式承载详情与工具页。推理核心为 <code>DeepFashionClassifier</code>，由 <code>ClassifierProvider</code> 提供应用级单例与结果缓存。</p>
+    <figure class="screenshot" style="max-width:100%;">
+      <img class="arch-img" src="images/architecture-diagram.png" alt="系统架构图" />
+      <figcaption>图 3-1 服饰识别软件 V1.2 系统架构图</figcaption>
+    </figure>
+
+    <h2 id="ch4" class="page-break">第四章 主界面与导航</h2>
+    <p>启动应用后进入主容器界面，底部导航栏固定五个入口：首页、识别、类别、历史、更多。各 Tab 切换时保留独立 Fragment，符合 Material 3 导航规范。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/02-home.png" alt="首页界面" onerror="this.style.display='none'" />
+      <div class="phone-mock" id="mock-home">
+        <div class="status"></div>
+        <div class="screen">
+          <div class="card-m"><strong>欢迎使用服饰识别</strong><br/>本周识别 12 次<br/>最常识别：T恤（5 次）</div>
+          <div class="card-m"><strong>最近识别</strong><br/>牛仔裤 · 87% · 今天 14:32</div>
+        </div>
+        <div class="nav-bar">
+          <span class="active">首页</span><span>识别</span><span>类别</span><span>历史</span><span>更多</span>
+        </div>
+      </div>
+      <figcaption>图 4-1 首页 Tab：展示本周统计摘要与最近识别记录</figcaption>
+    </figure>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/03-classify.png" alt="识别入口" onerror="this.style.display='none'" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <div class="card-m"><strong>选择识别方式</strong>
+            <div class="btn-m">开始识别（拍照）</div>
+            <div class="btn-m btn-outline">从相册选择</div>
+            <div class="btn-m" style="background:#7c4dff;">批量识别</div>
+          </div>
+        </div>
+        <div class="nav-bar">
+          <span>首页</span><span class="active">识别</span><span>类别</span><span>历史</span><span>更多</span>
+        </div>
+      </div>
+      <figcaption>图 4-2 识别 Tab：提供拍照、相册与批量识别三种入口</figcaption>
+    </figure>
+
+    <h2 id="ch5" class="page-break">第五章 服饰识别功能</h2>
+    <h3>5.1 相机拍摄识别</h3>
+    <p>点击「开始识别」进入全屏相机页。支持前后摄像头切换、双指缩放、单击/双击对焦（对焦框动画）、可选三分构图网格线与快门音效。顶部可切换<strong>单拍</strong>与<strong>连拍</strong>模式。</p>
+    <p>拍摄分辨率可在设置中选择高（1920×1080）、中（1280×720）、低（640×480）。拍照后在后台线程调用 ONNX 模型推理，完成后跳转结果页。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/04-camera-single.png" alt="相机单拍" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen" style="background:#222;min-height:480px;position:relative;">
+          <div style="text-align:center;margin:12px;">
+            <span class="tag" style="background:#6200ee;color:#fff;">单拍</span>
+            <span class="tag">连拍</span>
+          </div>
+          <div style="border:1px dashed #666;height:300px;margin:20px 8px;"></div>
+          <div style="position:absolute;bottom:60px;left:0;right:0;text-align:center;">
+            <span style="display:inline-block;width:64px;height:64px;border:3px solid #fff;border-radius:50%;"></span>
+          </div>
+        </div>
+      </div>
+      <figcaption>图 5-1 相机界面（单拍模式）：取景、对焦与快门</figcaption>
+    </figure>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/05-camera-burst.png" alt="连拍模式" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen" style="background:#222;min-height:480px;">
+          <div style="text-align:center;margin:12px;">
+            <span class="tag">单拍</span>
+            <span class="tag" style="background:#6200ee;color:#fff;">连拍</span>
+          </div>
+          <p style="color:#fff;text-align:center;">连拍 3 / 5</p>
+        </div>
+      </div>
+      <figcaption>图 5-2 连拍模式：连续拍摄 3/5/8 张并分别识别</figcaption>
+    </figure>
+
+    <h3>5.2 连拍结果策略</h3>
+    <p>设置中可配置连拍张数及结果策略：<strong>保留最高置信度</strong>（仅展示最优一张结果）或<strong>全部保存到批量结果</strong>（进入批量结果列表，可一键写入历史）。</p>
+
+    <h3>5.3 相册与批量识别</h3>
+    <p>识别 Tab 支持从系统相册选择单张或多张图片。批量识别页展示进度条，完成后列出每张图片的类别与置信度，支持全部保存到历史记录。</p>
+
+    <h2 id="ch6" class="page-break">第六章 识别结果与增强</h2>
+    <h3>6.1 结果展示</h3>
+    <p>结果页展示识别类别（中英文）、置信度进度条、百科描述。支持 Top-3 候选结果 Tab 切换。菜单提供分享（文字/图片，图片可带水印）、保存到相册、收藏、裁剪重识别、增强重识别等操作。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/06-result-top3.png" alt="识别结果" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <div class="card-m" style="text-align:center;">
+            <div style="height:120px;background:#ddd;border-radius:8px;margin-bottom:8px;"></div>
+            <strong style="font-size:16px;">T恤</strong><br/>置信度 89%
+            <div style="height:8px;background:#e0e0e0;border-radius:4px;margin:8px 0;"><div style="width:89%;height:100%;background:#6200ee;border-radius:4px;"></div></div>
+          </div>
+          <div style="display:flex;gap:4px;justify-content:center;">
+            <span class="tag">#1 89%</span><span class="tag">#2 6%</span><span class="tag">#3 3%</span>
+          </div>
+          <p style="font-size:11px;color:#666;">棉质短袖，休闲百搭…</p>
+        </div>
+      </div>
+      <figcaption>图 6-1 识别结果页：主结果、Top-3 与百科描述</figcaption>
+    </figure>
+
+    <h3>6.2 裁剪重识别</h3>
+    <p>用户可在结果页进入裁剪页，通过可拖拽、四角缩放的裁剪框（CropOverlayView）框选衣物区域，点击重识别后仅对选中区域推理，提高遮挡或背景复杂场景下的准确率。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/16-crop.png" alt="裁剪重识别" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <div style="height:280px;background:#ccc;position:relative;margin-bottom:8px;">
+            <div style="position:absolute;left:40px;top:60px;width:180px;height:160px;border:2px solid #ffc107;"></div>
+          </div>
+          <div class="btn-m">裁剪并重识别</div>
+        </div>
+      </div>
+      <figcaption>图 6-2 手动画框裁剪重识别界面</figcaption>
+    </figure>
+
+    <h3>6.3 增强重识别</h3>
+    <p>提供亮度、对比度、锐化三个 SeekBar 实时预览，满意后执行增强并重识别。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/17-enhance.png" alt="增强重识别" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <div style="height:160px;background:#bbb;border-radius:8px;margin-bottom:12px;"></div>
+          亮度 ━━━●━━<br/>对比度 ━━━●━━<br/>锐化 ━●━━━━
+          <div class="btn-m" style="margin-top:12px;">增强并重识别</div>
+        </div>
+      </div>
+      <figcaption>图 6-3 图像增强后重识别</figcaption>
+    </figure>
+
+    <h2 id="ch7" class="page-break">第七章 类别百科</h2>
+    <p>「类别」Tab 按服饰大类分组展示 50 个英文类别及中文译名，支持搜索。点击类别进入详情页，展示风格、适用场景、搭配建议、护理说明；可「开始识别」或「查看该类历史」（跳转历史 Tab 并预填类别筛选）。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/07-categories.png" alt="类别列表" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <input style="width:100%;padding:8px;border-radius:8px;border:1px solid #ccc;" placeholder="搜索类别名称…" readonly />
+          <div class="card-m">上衣 <span class="tag">T恤</span><span class="tag">衬衫</span></div>
+          <div class="card-m">下装 <span class="tag">牛仔裤</span></div>
+        </div>
+        <div class="nav-bar"><span>首页</span><span>识别</span><span class="active">类别</span><span>历史</span><span>更多</span></div>
+      </div>
+      <figcaption>图 7-1 50 类类别百科列表（可展开分组）</figcaption>
+    </figure>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/08-category-detail.png" alt="类别详情" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <h4 style="margin:0;">T恤</h4>
+          <p style="font-size:11px;">休闲棉质上衣…</p>
+          <div class="btn-m">开始识别</div>
+          <div class="btn-m btn-outline">查看该类历史</div>
+        </div>
+      </div>
+      <figcaption>图 7-2 类别详情与快捷操作</figcaption>
+    </figure>
+
+    <h2 id="ch8" class="page-break">第八章 历史记录管理</h2>
+    <p>历史 Tab 以时间倒序展示 JSONL 持久化记录，含缩略图、类别、置信度、时间。支持搜索、按类别/置信度/时间筛选、仅看收藏、多选批量删除与导出。点击记录可查看详情或跳转结果页。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/09-history.png" alt="历史记录" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <div class="card-m" style="display:flex;gap:8px;">
+            <div style="width:48px;height:48px;background:#ddd;border-radius:6px;"></div>
+            <div>牛仔裤 · 91%<br/><small>2026-05-31 10:20</small></div>
+          </div>
+          <div class="card-m" style="display:flex;gap:8px;">
+            <div style="width:48px;height:48px;background:#ddd;border-radius:6px;"></div>
+            <div>连衣裙 · 85%<br/><small>2026-05-30 18:05</small></div>
+          </div>
+        </div>
+        <div class="nav-bar"><span>首页</span><span>识别</span><span>类别</span><span class="active">历史</span><span>更多</span></div>
+      </div>
+      <figcaption>图 8-1 历史记录列表</figcaption>
+    </figure>
+
+    <h2 id="ch9">第九章 数据统计</h2>
+    <p>更多 → 数据统计：展示累计/本周识别次数、平均置信度、识别最少类别；近 7 日/30 日趋势柱状图；Top 类别饼图（含「其他」聚合）。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/11-statistics.png" alt="数据统计" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <div class="card-m">累计 128 次 · 本周 12 次<br/>平均置信度 82%</div>
+          <div class="card-m" style="height:80px;background:linear-gradient(90deg,#6200ee 20%,#bb86fc 40%,#6200ee 60%);opacity:.3;"></div>
+          <div style="width:100px;height:100px;border-radius:50%;background:conic-gradient(#6200ee 0 120deg,#bb86fc 120deg 200deg,#ccc 200deg);margin:8px auto;"></div>
+        </div>
+      </div>
+      <figcaption>图 9-1 数据统计：趋势图与类别饼图</figcaption>
+    </figure>
+
+    <h2 id="ch10" class="page-break">第十章 对比与分享</h2>
+    <p>对比记录功能：用户分别选择两条历史记录，并排展示缩略图、类别、置信度、百科描述及差异摘要（类别是否相同、置信度差值）。两侧均选中后可「生成长图」拼接后系统分享。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/12-compare.png" alt="对比记录" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <div style="display:flex;gap:4px;">
+            <div class="card-m" style="flex:1;">图A<br/>T恤 88%</div>
+            <div class="card-m" style="flex:1;">图B<br/>衬衫 76%</div>
+          </div>
+          <p style="font-size:11px;">类别不同 · 置信度差值 +12%</p>
+          <div class="btn-m">生成长图</div>
+        </div>
+      </div>
+      <figcaption>图 10-1 两条历史记录对比与长图分享</figcaption>
+    </figure>
+
+    <p>分享图片时可在设置中开启右下角水印「服饰识别 · 类别 置信度%」。</p>
+
+    <h2 id="ch11">第十一章 数据导出与本地备份</h2>
+    <p>导出数据页显示存储占用与记录条数。支持导出 JSONL、CSV 到下载目录；导出本地 ZIP 备份（含 history.jsonl 与 images 目录）；从 JSONL 或 ZIP 导入（追加合并或覆盖替换）。<strong>不提供账号云端同步。</strong></p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/13-export.png" alt="导出备份" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <div class="card-m">存储 12.5 MB · 记录 128 条</div>
+          <div class="btn-m">导出 JSONL</div>
+          <div class="btn-m btn-outline">导出 CSV</div>
+          <div class="btn-m btn-outline">导出本地 ZIP 备份</div>
+          <div class="btn-m btn-outline">导入本地备份</div>
+        </div>
+      </div>
+      <figcaption>图 11-1 本地数据导出与备份恢复</figcaption>
+    </figure>
+
+    <h2 id="ch12" class="page-break">第十二章 更多工具与设置</h2>
+    <p>「更多」Tab 以卡片网格入口：数据统计、收藏夹、对比记录、导出数据、崩溃日志、帮助中心、更新日志、模型信息、设置。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/14-more.png" alt="更多" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div class="card-m" style="text-align:center;padding:16px 4px;">统计</div>
+          <div class="card-m" style="text-align:center;padding:16px 4px;">收藏</div>
+          <div class="card-m" style="text-align:center;padding:16px 4px;">对比</div>
+          <div class="card-m" style="text-align:center;padding:16px 4px;">导出</div>
+          <div class="card-m" style="text-align:center;padding:16px 4px;">日志</div>
+          <div class="card-m" style="text-align:center;padding:16px 4px;">设置</div>
+        </div>
+        <div class="nav-bar"><span>首页</span><span>识别</span><span>类别</span><span>历史</span><span class="active">更多</span></div>
+      </div>
+      <figcaption>图 12-1 更多功能入口</figcaption>
+    </figure>
+
+    <h3>12.1 设置项说明</h3>
+    <table class="func-table">
+      <tr><th>设置项</th><th>说明</th></tr>
+      <tr><td>性能优先（多线程）</td><td>开启后 ONNX 使用约 CPU 核心数/2 的线程</td></tr>
+      <tr><td>界面语言</td><td>中文 / English，即时生效</td></tr>
+      <tr><td>主题</td><td>跟随系统 / 浅色 / 深色</td></tr>
+      <tr><td>结果展示密度</td><td>精简 / 标准 / 详细</td></tr>
+      <tr><td>构图网格线</td><td>相机取景三分线</td></tr>
+      <tr><td>快门音</td><td>拍照音效开关</td></tr>
+      <tr><td>默认摄像头</td><td>前置 / 后置</td></tr>
+      <tr><td>拍摄分辨率</td><td>高 / 中 / 低</td></tr>
+      <tr><td>连拍张数与策略</td><td>3/5/8 张；最优或全部批量</td></tr>
+      <tr><td>分享图片水印</td><td>分享图右下角水印开关</td></tr>
+    </table>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/15-settings.png" alt="设置" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen">
+          <div class="card-m">性能优先 ☑</div>
+          <div class="card-m">界面语言 › 中文</div>
+          <div class="card-m">主题 › 跟随系统</div>
+          <div class="card-m">拍摄分辨率 › 高</div>
+        </div>
+      </div>
+      <figcaption>图 12-2 系统设置界面</figcaption>
+    </figure>
+
+    <h3>12.2 崩溃日志</h3>
+    <p>应用启动时注册全局异常处理器，崩溃信息写入应用私有目录 logs/。用户可在「崩溃日志」页查看、删除单条或清空全部日志。</p>
+
+    <h2 id="ch13">第十三章 首次引导与帮助</h2>
+    <p>首次安装完成后展示四页引导：快速识别、手势对焦、类别百科、历史与管理。帮助中心提供 FAQ、权限说明、拍摄技巧。模型信息页展示版本号、模型结构、输入尺寸、推理线程数等。</p>
+
+    <figure class="screenshot">
+      <img class="real-shot" src="screenshots/01-onboarding.png" alt="首次引导" />
+      <div class="phone-mock">
+        <div class="status"></div>
+        <div class="screen" style="text-align:center;padding-top:80px;">
+          <strong>快速识别衣物</strong><p>拍照或相册选图<br/>离线识别 50 类服饰</p>
+          <div class="btn-m" style="margin-top:40px;">下一步</div>
+        </div>
+      </div>
+      <figcaption>图 13-1 首次使用引导页（共 4 页）</figcaption>
+    </figure>
+
+    <h2 id="ch14" class="page-break">附录 界面与 Activity 清单</h2>
+    <table class="func-table">
+      <tr><th>序号</th><th>界面名称</th><th>类名</th><th>功能摘要</th></tr>
+      <tr><td>1</td><td>主框架</td><td>MainContainerActivity</td><td>底部五 Tab 容器</td></tr>
+      <tr><td>2</td><td>首页</td><td>HomeFragment</td><td>统计摘要、最近识别</td></tr>
+      <tr><td>3</td><td>识别入口</td><td>ClassifyFragment</td><td>拍照/相册/批量入口</td></tr>
+      <tr><td>4</td><td>相机</td><td>CameraActivity</td><td>单拍/连拍、对焦缩放</td></tr>
+      <tr><td>5</td><td>识别结果</td><td>ResultActivity</td><td>Top-3、分享、收藏</td></tr>
+      <tr><td>6</td><td>类别列表</td><td>CategoryListFragment</td><td>50 类百科</td></tr>
+      <tr><td>7</td><td>类别详情</td><td>CategoryDetailActivity</td><td>百科与快捷操作</td></tr>
+      <tr><td>8</td><td>历史</td><td>HistoryFragment</td><td>筛选、多选、搜索</td></tr>
+      <tr><td>9</td><td>批量识别</td><td>BatchClassifyActivity</td><td>多图进度识别</td></tr>
+      <tr><td>10</td><td>批量结果</td><td>BatchResultActivity</td><td>列表、全部存历史</td></tr>
+      <tr><td>11</td><td>裁剪重识别</td><td>ImageCropActivity</td><td>手动画框</td></tr>
+      <tr><td>12</td><td>增强重识别</td><td>ImageEnhanceActivity</td><td>亮度/对比度/锐化</td></tr>
+      <tr><td>13</td><td>数据统计</td><td>StatisticsActivity</td><td>图表与指标</td></tr>
+      <tr><td>14</td><td>收藏夹</td><td>FavoritesActivity</td><td>收藏记录列表</td></tr>
+      <tr><td>15</td><td>对比</td><td>CompareActivity</td><td>双记录对比、长图</td></tr>
+      <tr><td>16</td><td>导出</td><td>ExportActivity</td><td>JSONL/CSV/ZIP</td></tr>
+      <tr><td>17</td><td>崩溃日志</td><td>LogViewerActivity</td><td>本地日志查看</td></tr>
+      <tr><td>18</td><td>设置</td><td>SettingsActivity</td><td>偏好配置</td></tr>
+      <tr><td>19</td><td>引导</td><td>OnboardingActivity</td><td>首次四页引导</td></tr>
+      <tr><td>20</td><td>帮助/日志/模型</td><td>Help/Changelog/ModelInfo</td><td>辅助信息页</td></tr>
+    </table>
+
+    <div class="note no-print">
+      <strong>使用说明：</strong>
+      <ol>
+        <li>用浏览器打开本 HTML 文件即可阅读；打印或「另存为 PDF」可用于软著提交。</li>
+        <li>将实机截图放入 <code>docs/screenshots/</code> 目录（见该目录 README），刷新后自动替换示意图。</li>
+        <li>封面请填写著作权人、开发完成日期等空白项。</li>
+        <li>软著通常要求文档连续页码不少于 30 页（打印时请在浏览器打印设置中显示页眉页脚/页码）。</li>
+      </ol>
+    </div>
+
+    <p style="text-align:center;color:#999;margin-top:48px;font-size:0.85rem;">— 文档结束 —</p>
+  </div>
+
+  <script>
+    document.querySelectorAll('figure.screenshot').forEach(fig => {
+      const img = fig.querySelector('img.real-shot');
+      if (!img) return;
+      const mock = fig.querySelector('.phone-mock');
+      const onOk = () => {
+        img.classList.add('loaded');
+        if (mock) mock.style.display = 'none';
+      };
+      const onFail = () => {
+        img.style.display = 'none';
+      };
+      img.addEventListener('load', onOk);
+      img.addEventListener('error', onFail);
+      if (img.complete) {
+        if (img.naturalWidth > 0) onOk();
+        else onFail();
+      }
+    });
+  </script>
+</body>
+</html>

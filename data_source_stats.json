@@ -1,0 +1,50 @@
+{
+  "local_clothing": {
+    "root": "F:\\commercial\\Clothing - Classification\\服装",
+    "subfolder_count": 3,
+    "total_images": 11287,
+    "subfolders": [
+      {
+        "folder": "上衣",
+        "image_count": 4064
+      },
+      {
+        "folder": "下装",
+        "image_count": 5119
+      },
+      {
+        "folder": "连身装",
+        "image_count": 2104
+      }
+    ],
+    "granularity": "3类粗粒度（上衣/下装/连身装），非DeepFashion 50类"
+  },
+  "deepfashion": {
+    "train": {
+      "image_list_lines": 14000
+    },
+    "train_cate": {
+      "label_lines": 14000,
+      "unique_classes": 45
+    },
+    "val": {
+      "image_list_lines": 2000
+    },
+    "val_cate": {
+      "label_lines": 2000,
+      "unique_classes": 35
+    },
+    "test": {
+      "image_list_lines": 4000
+    },
+    "test_cate": {
+      "label_lines": 4000,
+      "unique_classes": 41
+    },
+    "train_class_freq": {
+      "min_per_class": 1,
+      "max_per_class": 4016,
+      "mean_per_class": 311.1
+    }
+  }
+}

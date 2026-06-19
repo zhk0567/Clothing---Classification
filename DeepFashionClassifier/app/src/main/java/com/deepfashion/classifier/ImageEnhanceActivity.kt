@@ -9,7 +9,11 @@ import android.os.Bundle
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.deepfashion.classifier.databinding.ActivityImageEnhanceBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ImageEnhanceActivity : AppCompatActivity() {
 
@@ -39,18 +43,24 @@ class ImageEnhanceActivity : AppCompatActivity() {
 
         binding.btnReclassify.setOnClickListener {
             val enhanced = getEnhancedBitmap() ?: return@setOnClickListener
-            try {
-                val result = ClassifierProvider.classifyImage(this, enhanced, imagePath)
-                val intent = Intent(this, ResultActivity::class.java)
-                intent.putExtra("category", result.category)
-                intent.putExtra("confidence", result.confidence)
-                intent.putExtra("description", result.description)
-                intent.putExtra("imagePath", imagePath)
-                intent.putExtra("fromHistory", false)
-                startActivity(intent)
-                finish()
-            } catch (_: Exception) {
-                Toast.makeText(this, R.string.classify_failed, Toast.LENGTH_SHORT).show()
+            binding.btnReclassify.isEnabled = false
+            lifecycleScope.launch {
+                try {
+                    val result = withContext(Dispatchers.Default) {
+                        ClassifierProvider.classifyImage(this@ImageEnhanceActivity, enhanced, imagePath, useCache = false)
+                    }
+                    val intent = Intent(this@ImageEnhanceActivity, ResultActivity::class.java)
+                    intent.putExtra("category", result.category)
+                    intent.putExtra("confidence", result.confidence)
+                    intent.putExtra("description", result.description)
+                    intent.putExtra("imagePath", imagePath)
+                    intent.putExtra("fromHistory", false)
+                    startActivity(intent)
+                    finish()
+                } catch (_: Exception) {
+                    binding.btnReclassify.isEnabled = true
+                    Toast.makeText(this@ImageEnhanceActivity, R.string.classify_failed, Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

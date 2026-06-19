@@ -6,4 +6,40 @@
         <item name="android:textStyle">bold</item>
         <item name="android:letterSpacing">0.02</item>
     </style>
+
+    <style name="TextAppearance.Home.Display" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:textSize">24sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/home_text_primary</item>
+        <item name="android:letterSpacing">0.01</item>
+    </style>
+
+    <style name="TextAppearance.Home.Title" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/home_text_primary</item>
+    </style>
+
+    <style name="TextAppearance.Home.Body" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+    </style>
+
+    <style name="TextAppearance.Home.Caption" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/home_text_secondary</item>
+    </style>
+
+    <style name="TextAppearance.Home.StatNumber" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:textSize">@dimen/home_stat_number_size</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/home_stat_number</item>
+    </style>
+
+    <style name="Widget.Home.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardCornerRadius">@dimen/home_card_radius</item>
+        <item name="cardElevation">2dp</item>
+        <item name="cardBackgroundColor">@color/home_surface</item>
+    </style>
 </resources>

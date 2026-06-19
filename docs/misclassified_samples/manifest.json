@@ -1,0 +1,82 @@
+[
+  {
+    "file": "01_true-Romper_pred-Jumpsuit_conf0.98.jpg",
+    "sample_index": 3393,
+    "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\V-Cut_Back_Romper\\img_00000042.jpg",
+    "true_class": "Romper",
+    "pred_class": "Jumpsuit",
+    "true_class_zh": "连体短裤",
+    "pred_class_zh": "连体衣",
+    "pred_confidence": 0.9833
+  },
+  {
+    "file": "02_true-Romper_pred-Jumpsuit_conf0.97.jpg",
+    "sample_index": 3703,
+    "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Southwestern-Printed_Surplice_Romper\\img_00000004.jpg",
+    "true_class": "Romper",
+    "pred_class": "Jumpsuit",
+    "true_class_zh": "连体短裤",
+    "pred_class_zh": "连体衣",
+    "pred_confidence": 0.9746
+  },
+  {
+    "file": "03_true-Jumpsuit_pred-Romper_conf0.96.jpg",
+    "sample_index": 398,
+    "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Denim_Drawstring_Jumpsuit\\img_00000055.jpg",
+    "true_class": "Jumpsuit",
+    "pred_class": "Romper",
+    "true_class_zh": "连体衣",
+    "pred_class_zh": "连体短裤",
+    "pred_confidence": 0.9589
+  },
+  {
+    "file": "04_true-Tee_pred-Tank_conf0.96.jpg",
+    "sample_index": 2986,
+    "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Grumpy_Cat_Graphic_Tee\\img_00000026.jpg",
+    "true_class": "Tee",
+    "pred_class": "Tank",
+    "true_class_zh": "T恤",
+    "pred_class_zh": "背心",
+    "pred_confidence": 0.9554
+  },
+  {
+    "file": "05_true-Sweatpants_pred-Skirt_conf0.94.jpg",
+    "sample_index": 1099,
+    "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Leopard_Print_Knit_Sweatpants\\img_00000045.jpg",
+    "true_class": "Sweatpants",
+    "pred_class": "Skirt",
+    "true_class_zh": "运动裤",
+    "pred_class_zh": "裙子",
+    "pred_confidence": 0.9413
+  },
+  {
+    "file": "06_true-Sweater_pred-Tee_conf0.94.jpg",
+    "sample_index": 1646,
+    "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Striped_Crew_Neck_Sweater\\img_00000068.jpg",
+    "true_class": "Sweater",
+    "pred_class": "Tee",
+    "true_class_zh": "毛衣",
+    "pred_class_zh": "T恤",
+    "pred_confidence": 0.9369
+  },
+  {
+    "file": "07_true-Skirt_pred-Shorts_conf0.94.jpg",
+    "sample_index": 1684,
+    "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Plaid_Skater_Skirt\\img_00000063.jpg",
+    "true_class": "Skirt",
+    "pred_class": "Shorts",
+    "true_class_zh": "裙子",
+    "pred_class_zh": "短裤",
+    "pred_confidence": 0.9353
+  },
+  {
+    "file": "08_true-Blouse_pred-Jumpsuit_conf0.94.jpg",
+    "sample_index": 1763,
+    "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Collarless_V-Neck_Blouse\\img_00000022.jpg",
+    "true_class": "Blouse",
+    "pred_class": "Jumpsuit",
+    "true_class_zh": "女式衬衫",
+    "pred_class_zh": "连体衣",
+    "pred_confidence": 0.9351
+  }
+]

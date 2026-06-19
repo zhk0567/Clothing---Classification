@@ -22,8 +22,13 @@ object ClassifierProvider {
         return classifier!!
     }
 
-    fun classifyImage(context: Context, bitmap: Bitmap, imagePath: String? = null): DeepFashionClassifier.ClassificationResult {
-        val key = cacheKey(imagePath)
+    fun classifyImage(
+        context: Context,
+        bitmap: Bitmap,
+        imagePath: String? = null,
+        useCache: Boolean = true
+    ): DeepFashionClassifier.ClassificationResult {
+        val key = if (useCache) cacheKey(imagePath) else null
         if (key != null) {
             synchronized(cache) {
                 cache[key]?.let { return it }

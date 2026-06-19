@@ -5,7 +5,11 @@ import android.os.Bundle
 import android.widget.AdapterView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.deepfashion.classifier.databinding.ActivityFavoritesBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class FavoritesActivity : AppCompatActivity() {
 
@@ -20,13 +24,9 @@ class FavoritesActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         title = getString(R.string.favorites)
 
-        items = HistoryRepository.loadAll(this).filter { it.isFavorite }
-        adapter = HistoryAdapter(this, items)
+        adapter = HistoryAdapter(this, items, lifecycleScope)
         binding.listFavorites.adapter = adapter
-
-        if (items.isEmpty()) {
-            Toast.makeText(this, R.string.no_favorites, Toast.LENGTH_SHORT).show()
-        }
+        loadFavorites(showEmptyToast = true)
 
         binding.listFavorites.onItemClickListener = AdapterView.OnItemClickListener { _, _, pos, _ ->
             val item = items[pos]
@@ -43,8 +43,20 @@ class FavoritesActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        items = HistoryRepository.loadAll(this).filter { it.isFavorite }
-        adapter.update(items)
+        loadFavorites()
+    }
+
+    private fun loadFavorites(showEmptyToast: Boolean = false) {
+        lifecycleScope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                HistoryRepository.loadAll(this@FavoritesActivity).filter { it.isFavorite }
+            }
+            items = loaded
+            adapter.update(items)
+            if (showEmptyToast && items.isEmpty()) {
+                Toast.makeText(this@FavoritesActivity, R.string.no_favorites, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     override fun onSupportNavigateUp(): Boolean {

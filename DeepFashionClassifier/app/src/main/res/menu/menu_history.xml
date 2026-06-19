@@ -11,21 +11,15 @@
         android:id="@+id/action_clear_history"
         android:title="@string/clear_history"
         android:icon="@android:drawable/ic_menu_delete"
-        app:showAsAction="always" />
+        app:showAsAction="ifRoom" />
     <item
         android:id="@+id/action_multi_select"
         android:title="@string/multi_select"
-        app:showAsAction="never" />
+        android:icon="@android:drawable/checkbox_on_background"
+        app:showAsAction="ifRoom" />
     <item
-        android:id="@+id/action_batch_delete"
-        android:title="@string/batch_delete"
-        app:showAsAction="never"
-        android:visible="false" />
-    <item
-        android:id="@+id/action_batch_export"
-        android:title="@string/batch_export"
-        app:showAsAction="never"
-        android:visible="false" />
+        android:id="@+id/action_cancel_multi_select"
+        android:title="@string/cancel_multi_select"
+        android:visible="false"
+        app:showAsAction="always" />
 </menu>
-
-

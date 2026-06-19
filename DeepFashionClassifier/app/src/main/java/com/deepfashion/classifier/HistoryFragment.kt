@@ -17,8 +17,12 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import com.deepfashion.classifier.databinding.ActivityHistoryBinding
 import com.google.android.material.chip.Chip
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,12 +55,16 @@ class HistoryFragment : Fragment() {
         arguments?.getString(ARG_CATEGORY_FILTER)?.let { categoryEn ->
             selectedCategories = setOf(categoryEn)
         }
-        adapter = HistoryAdapter(requireContext(), filteredItems)
+        adapter = HistoryAdapter(requireContext(), filteredItems, viewLifecycleOwner.lifecycleScope)
         binding.listView.adapter = adapter
         binding.root.setOnClickListener { hideKeyboard() }
         setupSearchAndFilters()
+        setupListListeners()
+        setupMultiSelectBar()
         setupMenu()
-        loadHistory()
+        if (selectedCategories.isNotEmpty()) {
+            updateFilterChips()
+        }
     }
 
     override fun onResume() {
@@ -71,10 +79,11 @@ class HistoryFragment : Fragment() {
             }
 
             override fun onPrepareMenu(menu: Menu) {
-                menu.findItem(R.id.action_show_favorites)?.isChecked = showFavoritesOnly
+                menu.findItem(R.id.action_show_favorites)?.isVisible = !multiSelectMode
+                menu.findItem(R.id.action_clear_history)?.isVisible = !multiSelectMode
                 menu.findItem(R.id.action_multi_select)?.isVisible = !multiSelectMode
-                menu.findItem(R.id.action_batch_delete)?.isVisible = multiSelectMode
-                menu.findItem(R.id.action_batch_export)?.isVisible = multiSelectMode
+                menu.findItem(R.id.action_cancel_multi_select)?.isVisible = multiSelectMode
+                menu.findItem(R.id.action_show_favorites)?.isChecked = showFavoritesOnly
             }
 
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
@@ -92,6 +101,7 @@ class HistoryFragment : Fragment() {
                             .setMessage(R.string.clear_history_message)
                             .setPositiveButton(R.string.clear) { _, _ ->
                                 HistoryRepository.clearAll(requireContext())
+                                exitMultiSelectMode()
                                 loadHistory()
                             }
                             .setNegativeButton(android.R.string.cancel, null)
@@ -99,32 +109,11 @@ class HistoryFragment : Fragment() {
                         true
                     }
                     R.id.action_multi_select -> {
-                        multiSelectMode = true
-                        selectedItems.clear()
-                        requireActivity().invalidateOptionsMenu()
+                        enterMultiSelectMode()
                         true
                     }
-                    R.id.action_batch_delete -> {
-                        if (selectedItems.isEmpty()) {
-                            Toast.makeText(requireContext(), R.string.select_items_first, Toast.LENGTH_SHORT).show()
-                        } else {
-                            HistoryRepository.deleteEntries(requireContext(), selectedItems.toList())
-                            multiSelectMode = false
-                            selectedItems.clear()
-                            loadHistory()
-                            requireActivity().invalidateOptionsMenu()
-                        }
-                        true
-                    }
-                    R.id.action_batch_export -> {
-                        if (selectedItems.isEmpty()) {
-                            Toast.makeText(requireContext(), R.string.select_items_first, Toast.LENGTH_SHORT).show()
-                        } else {
-                            ExportHelper.exportSelected(requireContext(), selectedItems.toList())
-                            multiSelectMode = false
-                            selectedItems.clear()
-                            requireActivity().invalidateOptionsMenu()
-                        }
+                    R.id.action_cancel_multi_select -> {
+                        exitMultiSelectMode()
                         true
                     }
                     else -> false
@@ -313,18 +302,24 @@ class HistoryFragment : Fragment() {
             matchFavorite && matchCategory && matchConfidence && matchTime && matchSearch
         }
         adapter.update(filteredItems)
-        updateFilterChips()
+        if (multiSelectMode) {
+            selectedItems.retainAll(filteredItems.toSet())
+            updateMultiSelectUi()
+        }
     }
 
-    private fun isToday(timeStr: String): Boolean = try {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val itemDate = sdf.format(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timeStr) ?: Date())
-        itemDate == sdf.format(Date())
-    } catch (_: Exception) { false }
+    private fun isToday(timeStr: String): Boolean {
+        return try {
+            val itemDate = dateTimeFormat.parse(timeStr) ?: return false
+            dateFormat.format(itemDate) == dateFormat.format(Date())
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     private fun isWithinWeek(timeStr: String): Boolean {
         return try {
-            val itemDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timeStr) ?: return false
+            val itemDate = dateTimeFormat.parse(timeStr) ?: return false
             val diff = Date().time - itemDate.time
             diff in 0..7 * 24 * 60 * 60 * 1000L
         } catch (_: Exception) {
@@ -334,7 +329,7 @@ class HistoryFragment : Fragment() {
 
     private fun isWithinMonth(timeStr: String): Boolean {
         return try {
-            val itemDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timeStr) ?: return false
+            val itemDate = dateTimeFormat.parse(timeStr) ?: return false
             val diff = Date().time - itemDate.time
             diff in 0..30L * 24 * 60 * 60 * 1000L
         } catch (_: Exception) {
@@ -343,14 +338,27 @@ class HistoryFragment : Fragment() {
     }
 
     private fun loadHistory() {
-        allItems = HistoryRepository.loadAll(requireContext())
-        applyFilters()
+        val ctx = requireContext().applicationContext
+        viewLifecycleOwner.lifecycleScope.launch {
+            val items = withContext(Dispatchers.IO) {
+                HistoryRepository.loadAll(ctx)
+            }
+            if (!isAdded) return@launch
+            allItems = items
+            applyFilters()
+            withContext(Dispatchers.IO) {
+                val paths = items.take(24).mapNotNull { it.imagePath }
+                HistoryThumbnailCache.preload(paths)
+            }
+        }
+    }
+
+    private fun setupListListeners() {
         binding.listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             hideKeyboard()
             val item = filteredItems[position]
             if (multiSelectMode) {
-                if (selectedItems.contains(item)) selectedItems.remove(item) else selectedItems.add(item)
-                Toast.makeText(requireContext(), getString(R.string.selected_count, selectedItems.size), Toast.LENGTH_SHORT).show()
+                toggleSelection(item)
             } else {
                 openResult(item)
             }
@@ -358,21 +366,97 @@ class HistoryFragment : Fragment() {
         binding.listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
             val item = filteredItems[position]
             if (multiSelectMode) {
-                if (selectedItems.contains(item)) selectedItems.remove(item) else selectedItems.add(item)
-                true
+                toggleSelection(item)
             } else {
-                AlertDialog.Builder(requireContext())
-                    .setTitle(R.string.delete_record)
-                    .setMessage(R.string.delete_record_confirm)
-                    .setPositiveButton(R.string.delete) { _, _ ->
-                        HistoryRepository.deleteEntry(requireContext(), item)
-                        loadHistory()
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .show()
-                true
+                enterMultiSelectMode()
+                selectedItems.add(item)
+                updateMultiSelectUi()
             }
+            true
         }
+    }
+
+    private fun setupMultiSelectBar() {
+        binding.btnMultiCancel.setOnClickListener { exitMultiSelectMode() }
+        binding.btnMultiSelectAll.setOnClickListener {
+            if (selectedItems.size == filteredItems.size) {
+                selectedItems.clear()
+            } else {
+                selectedItems.clear()
+                selectedItems.addAll(filteredItems)
+            }
+            updateMultiSelectUi()
+        }
+        binding.btnMultiDelete.setOnClickListener { confirmBatchDelete() }
+        binding.btnMultiExport.setOnClickListener { batchExport() }
+    }
+
+    private fun enterMultiSelectMode() {
+        multiSelectMode = true
+        selectedItems.clear()
+        updateMultiSelectUi()
+    }
+
+    private fun exitMultiSelectMode() {
+        multiSelectMode = false
+        selectedItems.clear()
+        updateMultiSelectUi()
+    }
+
+    private fun toggleSelection(item: HistoryItem) {
+        if (selectedItems.contains(item)) {
+            selectedItems.remove(item)
+        } else {
+            selectedItems.add(item)
+        }
+        updateMultiSelectUi()
+    }
+
+    private fun updateMultiSelectUi() {
+        if (multiSelectMode) {
+            binding.multiSelectBar.visibility = View.VISIBLE
+            binding.filterCard.visibility = View.GONE
+            hideKeyboard()
+            binding.tvSelectedCount.text = getString(R.string.selected_count, selectedItems.size)
+            val allSelected = selectedItems.size == filteredItems.size && filteredItems.isNotEmpty()
+            binding.btnMultiSelectAll.setIconResource(
+                if (allSelected) R.drawable.ic_deselect_all else R.drawable.ic_select_all
+            )
+            binding.btnMultiSelectAll.contentDescription = getString(
+                if (allSelected) R.string.deselect_all else R.string.select_all
+            )
+            binding.btnMultiDelete.isEnabled = selectedItems.isNotEmpty()
+            binding.btnMultiExport.isEnabled = selectedItems.isNotEmpty()
+            binding.btnMultiDelete.alpha = if (selectedItems.isNotEmpty()) 1f else 0.38f
+            binding.btnMultiExport.alpha = if (selectedItems.isNotEmpty()) 1f else 0.38f
+        } else {
+            binding.multiSelectBar.visibility = View.GONE
+            binding.filterCard.visibility = View.VISIBLE
+        }
+        adapter.setSelectionState(multiSelectMode, selectedItems.toSet())
+        requireActivity().invalidateOptionsMenu()
+    }
+
+    private fun confirmBatchDelete() {
+        if (selectedItems.isEmpty()) return
+        val count = selectedItems.size
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.batch_delete)
+            .setMessage(getString(R.string.batch_delete_confirm, count))
+            .setPositiveButton(R.string.delete) { _, _ ->
+                HistoryRepository.deleteEntries(requireContext(), selectedItems.toList())
+                exitMultiSelectMode()
+                loadHistory()
+                Toast.makeText(requireContext(), getString(R.string.batch_delete_success, count), Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun batchExport() {
+        if (selectedItems.isEmpty()) return
+        ExportHelper.exportSelected(requireContext(), selectedItems.toList())
+        exitMultiSelectMode()
     }
 
     private fun openResult(item: HistoryItem) {
@@ -393,6 +477,8 @@ class HistoryFragment : Fragment() {
 
     companion object {
         private const val ARG_CATEGORY_FILTER = "category_filter"
+        private val dateTimeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
         fun newInstance(categoryFilter: String? = null): HistoryFragment {
             return HistoryFragment().apply {

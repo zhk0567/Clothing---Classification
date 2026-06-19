@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="home_padding">20dp</dimen>
+    <dimen name="home_card_radius">16dp</dimen>
+    <dimen name="home_section_gap">20dp</dimen>
+    <dimen name="home_item_gap">10dp</dimen>
+    <dimen name="home_button_height">52dp</dimen>
+    <dimen name="home_stat_number_size">32sp</dimen>
+</resources>

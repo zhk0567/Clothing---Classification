@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 720" width="920" height="720">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f3e8ff"/>
+      <stop offset="100%" stop-color="#e8eaf6"/>
+    </linearGradient>
+    <linearGradient id="mainGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7c4dff"/>
+      <stop offset="100%" stop-color="#6200ee"/>
+    </linearGradient>
+    <linearGradient id="tabGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9575cd"/>
+      <stop offset="100%" stop-color="#673ab7"/>
+    </linearGradient>
+    <linearGradient id="fragGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#b39ddb"/>
+      <stop offset="100%" stop-color="#7e57c2"/>
+    </linearGradient>
+    <linearGradient id="actGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7986cb"/>
+      <stop offset="100%" stop-color="#3949ab"/>
+    </linearGradient>
+    <linearGradient id="modelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#26a69a"/>
+      <stop offset="100%" stop-color="#00897b"/>
+    </linearGradient>
+    <filter id="shadow" x="-8%" y="-8%" width="116%" height="116%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#455a64"/>
+    </marker>
+  </defs>
+  <rect width="920" height="720" fill="url(#bgGrad)" rx="12"/>
+  <text x="460" y="36" text-anchor="middle" font-family="Microsoft YaHei, Segoe UI, sans-serif" font-size="20" font-weight="bold" fill="#3700b3">&#x670D;&#x9970;&#x8BC6;&#x522B;&#x8F6F;&#x4EF6; V1.2 &#x2014; &#x7CFB;&#x7EDF;&#x67B6;&#x6784;&#x56FE;</text>
+  <g filter="url(#shadow)">
+    <rect x="80" y="58" width="760" height="118" rx="10" fill="url(#mainGrad)" stroke="#4527a0" stroke-width="2"/>
+    <text x="460" y="88" text-anchor="middle" font-family="Consolas, Microsoft YaHei, sans-serif" font-size="17" font-weight="bold" fill="#fff">MainContainerActivity</text>
+    <text x="460" y="108" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#e1bee7">&#x4E3B;&#x5BB9;&#x5668; &#xB7; BottomNavigationView</text>
+    <rect x="110" y="118" width="120" height="44" rx="6" fill="url(#tabGrad)"/>
+    <text x="170" y="146" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#fff">&#x9996;&#x9875;</text>
+    <rect x="242" y="118" width="120" height="44" rx="6" fill="url(#tabGrad)"/>
+    <text x="302" y="146" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#fff">&#x8BC6;&#x522B;</text>
+    <rect x="374" y="118" width="120" height="44" rx="6" fill="url(#tabGrad)"/>
+    <text x="434" y="146" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#fff">&#x7C7B;&#x522B;</text>
+    <rect x="506" y="118" width="120" height="44" rx="6" fill="url(#tabGrad)"/>
+    <text x="566" y="146" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#fff">&#x5386;&#x53F2;</text>
+    <rect x="638" y="118" width="120" height="44" rx="6" fill="url(#tabGrad)"/>
+    <text x="698" y="146" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#fff">&#x66F4;&#x591A;</text>
+  </g>
+  <line x1="170" y1="176" x2="170" y2="210" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="302" y1="176" x2="302" y2="210" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="434" y1="176" x2="434" y2="210" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="566" y1="176" x2="566" y2="210" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="698" y1="176" x2="698" y2="210" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <g filter="url(#shadow)">
+    <rect x="110" y="212" width="120" height="52" rx="8" fill="url(#fragGrad)"/>
+    <text x="170" y="235" text-anchor="middle" font-family="Consolas, sans-serif" font-size="11" fill="#fff">HomeFragment</text>
+    <rect x="242" y="212" width="120" height="52" rx="8" fill="url(#fragGrad)"/>
+    <text x="302" y="235" text-anchor="middle" font-family="Consolas, sans-serif" font-size="11" fill="#fff">ClassifyFragment</text>
+    <rect x="374" y="212" width="120" height="52" rx="8" fill="url(#fragGrad)"/>
+    <text x="434" y="235" text-anchor="middle" font-family="Consolas, sans-serif" font-size="11" fill="#fff">CategoryList</text>
+    <rect x="506" y="212" width="120" height="52" rx="8" fill="url(#fragGrad)"/>
+    <text x="566" y="235" text-anchor="middle" font-family="Consolas, sans-serif" font-size="11" fill="#fff">HistoryFragment</text>
+    <rect x="638" y="212" width="120" height="52" rx="8" fill="url(#fragGrad)"/>
+    <text x="698" y="235" text-anchor="middle" font-family="Consolas, sans-serif" font-size="11" fill="#fff">MoreFragment</text>
+  </g>
+  <line x1="302" y1="264" x2="302" y2="310" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <g filter="url(#shadow)">
+    <rect x="212" y="312" width="180" height="56" rx="8" fill="url(#actGrad)"/>
+    <text x="302" y="340" text-anchor="middle" font-family="Consolas, sans-serif" font-size="13" font-weight="bold" fill="#fff">CameraActivity</text>
+  </g>
+  <line x1="302" y1="368" x2="302" y2="408" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <g filter="url(#shadow)">
+    <rect x="212" y="410" width="180" height="56" rx="8" fill="url(#actGrad)"/>
+    <text x="302" y="438" text-anchor="middle" font-family="Consolas, sans-serif" font-size="13" font-weight="bold" fill="#fff">ResultActivity</text>
+  </g>
+  <line x1="392" y1="438" x2="480" y2="438" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <g filter="url(#shadow)">
+    <rect x="482" y="410" width="200" height="56" rx="8" fill="#5c6bc0"/>
+    <text x="582" y="438" text-anchor="middle" font-family="Consolas, sans-serif" font-size="12" fill="#fff">Crop / Enhance</text>
+  </g>
+  <line x1="698" y1="264" x2="698" y2="300" stroke="#455a64" stroke-width="2"/>
+  <line x1="698" y1="300" x2="760" y2="300" stroke="#455a64" stroke-width="2"/>
+  <line x1="760" y1="300" x2="760" y2="330" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <g filter="url(#shadow)">
+    <rect x="620" y="332" width="280" height="88" rx="8" fill="url(#actGrad)"/>
+    <text x="760" y="362" text-anchor="middle" font-family="Consolas, sans-serif" font-size="11" fill="#fff">Statistics / Export / Settings</text>
+    <text x="760" y="382" text-anchor="middle" font-family="Consolas, sans-serif" font-size="11" fill="#fff">Compare / Favorites / Logs</text>
+  </g>
+  <line x1="434" y1="264" x2="434" y2="310" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <g filter="url(#shadow)">
+    <rect x="354" y="312" width="160" height="48" rx="8" fill="#7986cb"/>
+    <text x="434" y="342" text-anchor="middle" font-family="Consolas, sans-serif" font-size="12" fill="#fff">CategoryDetail</text>
+  </g>
+  <line x1="302" y1="466" x2="302" y2="520" stroke="#455a64" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <g filter="url(#shadow)">
+    <rect x="152" y="522" width="300" height="48" rx="8" fill="#546e7a"/>
+    <text x="302" y="552" text-anchor="middle" font-family="Consolas, sans-serif" font-size="13" fill="#fff">ClassifierProvider</text>
+  </g>
+  <line x1="302" y1="570" x2="302" y2="598" stroke="#455a64" stroke-width="2" marker-end="url(#arrow)"/>
+  <g filter="url(#shadow)">
+    <rect x="100" y="600" width="720" height="88" rx="10" fill="url(#modelGrad)" stroke="#00695c" stroke-width="2"/>
+    <text x="460" y="632" text-anchor="middle" font-family="Consolas, sans-serif" font-size="16" font-weight="bold" fill="#fff">DeepFashionClassifier + ONNX Runtime</text>
+    <text x="460" y="658" text-anchor="middle" font-family="Consolas, sans-serif" font-size="13" fill="#b2dfdb">assets/models/deepfashion_classifier.onnx</text>
+  </g>
+</svg>

@@ -1,0 +1,697 @@
+{
+  "model": "deepfashion_best_model.pth",
+  "device": "cpu",
+  "notes": {
+    "training_config_best_val_acc": 61.55,
+    "val_acc_rerun_note": "独立评估脚本复现值，与训练日志 best 可能差 0.05 个百分点以内"
+  },
+  "validation": {
+    "size": 2000,
+    "loss": 1.4517,
+    "top1_acc": 61.5,
+    "top3_acc": 79.75
+  },
+  "test": {
+    "size": 4000,
+    "loss": 1.5355,
+    "top1_acc": 58.73,
+    "top3_acc": 79.0,
+    "per_class": [
+      {
+        "class_idx": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 3
+      },
+      {
+        "class_idx": 1,
+        "precision": 0.463,
+        "recall": 0.2232,
+        "f1": 0.3012,
+        "support": 112
+      },
+      {
+        "class_idx": 2,
+        "precision": 0.4182,
+        "recall": 0.4478,
+        "f1": 0.4325,
+        "support": 297
+      },
+      {
+        "class_idx": 3,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4
+      },
+      {
+        "class_idx": 4,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 1
+      },
+      {
+        "class_idx": 5,
+        "precision": 0.399,
+        "recall": 0.4091,
+        "f1": 0.404,
+        "support": 198
+      },
+      {
+        "class_idx": 6,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7
+      },
+      {
+        "class_idx": 7,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      },
+      {
+        "class_idx": 8,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 13
+      },
+      {
+        "class_idx": 9,
+        "precision": 0.449,
+        "recall": 0.3438,
+        "f1": 0.3894,
+        "support": 64
+      },
+      {
+        "class_idx": 10,
+        "precision": 0.2664,
+        "recall": 0.5036,
+        "f1": 0.3485,
+        "support": 137
+      },
+      {
+        "class_idx": 11,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 14
+      },
+      {
+        "class_idx": 12,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 9
+      },
+      {
+        "class_idx": 13,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 1
+      },
+      {
+        "class_idx": 14,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 12
+      },
+      {
+        "class_idx": 15,
+        "precision": 0.4936,
+        "recall": 0.4583,
+        "f1": 0.4753,
+        "support": 168
+      },
+      {
+        "class_idx": 16,
+        "precision": 0.5507,
+        "recall": 0.5952,
+        "f1": 0.5721,
+        "support": 210
+      },
+      {
+        "class_idx": 17,
+        "precision": 0.6226,
+        "recall": 0.5802,
+        "f1": 0.6007,
+        "support": 455
+      },
+      {
+        "class_idx": 18,
+        "precision": 0.2564,
+        "recall": 0.0602,
+        "f1": 0.0976,
+        "support": 166
+      },
+      {
+        "class_idx": 19,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 2
+      },
+      {
+        "class_idx": 20,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 1
+      },
+      {
+        "class_idx": 21,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 12
+      },
+      {
+        "class_idx": 22,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4
+      },
+      {
+        "class_idx": 23,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15
+      },
+      {
+        "class_idx": 24,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      },
+      {
+        "class_idx": 25,
+        "precision": 0.554,
+        "recall": 0.7333,
+        "f1": 0.6311,
+        "support": 105
+      },
+      {
+        "class_idx": 26,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16
+      },
+      {
+        "class_idx": 27,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 3
+      },
+      {
+        "class_idx": 28,
+        "precision": 0.25,
+        "recall": 0.1857,
+        "f1": 0.2131,
+        "support": 70
+      },
+      {
+        "class_idx": 29,
+        "precision": 0.6197,
+        "recall": 0.6567,
+        "f1": 0.6377,
+        "support": 67
+      },
+      {
+        "class_idx": 30,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      },
+      {
+        "class_idx": 31,
+        "precision": 0.6174,
+        "recall": 0.6455,
+        "f1": 0.6311,
+        "support": 220
+      },
+      {
+        "class_idx": 32,
+        "precision": 0.6283,
+        "recall": 0.5581,
+        "f1": 0.5911,
+        "support": 215
+      },
+      {
+        "class_idx": 33,
+        "precision": 0.2453,
+        "recall": 0.4483,
+        "f1": 0.3171,
+        "support": 29
+      },
+      {
+        "class_idx": 34,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 14
+      },
+      {
+        "class_idx": 35,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8
+      },
+      {
+        "class_idx": 36,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      },
+      {
+        "class_idx": 37,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      },
+      {
+        "class_idx": 38,
+        "precision": 0.3056,
+        "recall": 0.44,
+        "f1": 0.3607,
+        "support": 25
+      },
+      {
+        "class_idx": 39,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      },
+      {
+        "class_idx": 40,
+        "precision": 0.7737,
+        "recall": 0.9445,
+        "f1": 0.8506,
+        "support": 1064
+      },
+      {
+        "class_idx": 41,
+        "precision": 0.6279,
+        "recall": 0.5143,
+        "f1": 0.5654,
+        "support": 105
+      },
+      {
+        "class_idx": 42,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 1
+      },
+      {
+        "class_idx": 43,
+        "precision": 0.2,
+        "recall": 0.0556,
+        "f1": 0.087,
+        "support": 36
+      },
+      {
+        "class_idx": 44,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      },
+      {
+        "class_idx": 45,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 2
+      },
+      {
+        "class_idx": 46,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 2
+      },
+      {
+        "class_idx": 47,
+        "precision": 0.5962,
+        "recall": 0.5487,
+        "f1": 0.5714,
+        "support": 113
+      },
+      {
+        "class_idx": 48,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      },
+      {
+        "class_idx": 49,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      }
+    ],
+    "macro_precision": 0.1867,
+    "macro_recall": 0.187,
+    "macro_f1": 0.1816,
+    "macro_precision_present": 0.2277,
+    "macro_recall_present": 0.2281,
+    "macro_f1_present": 0.2214,
+    "num_classes_with_support": 41,
+    "micro_accuracy_top1": 58.72,
+    "top_confusions": [
+      {
+        "true_idx": 32,
+        "pred_idx": 40,
+        "count": 52,
+        "true_class": "Skirt",
+        "pred_class": "Dress",
+        "true_class_zh": "裙子",
+        "pred_class_zh": "连衣裙"
+      },
+      {
+        "true_idx": 18,
+        "pred_idx": 2,
+        "count": 43,
+        "true_class": "Top",
+        "pred_class": "Blouse",
+        "true_class_zh": "上衣",
+        "pred_class_zh": "女式衬衫"
+      },
+      {
+        "true_idx": 2,
+        "pred_idx": 40,
+        "count": 37,
+        "true_class": "Blouse",
+        "pred_class": "Dress",
+        "true_class_zh": "女式衬衫",
+        "pred_class_zh": "连衣裙"
+      },
+      {
+        "true_idx": 1,
+        "pred_idx": 10,
+        "count": 37,
+        "true_class": "Blazer",
+        "pred_class": "Jacket",
+        "true_class_zh": "西装外套",
+        "pred_class_zh": "夹克"
+      },
+      {
+        "true_idx": 47,
+        "pred_idx": 40,
+        "count": 36,
+        "true_class": "Romper",
+        "pred_class": "Dress",
+        "true_class_zh": "连体短裤",
+        "pred_class_zh": "连衣裙"
+      },
+      {
+        "true_idx": 41,
+        "pred_idx": 40,
+        "count": 36,
+        "true_class": "Jumpsuit",
+        "pred_class": "Dress",
+        "true_class_zh": "连体衣",
+        "pred_class_zh": "连衣裙"
+      },
+      {
+        "true_idx": 17,
+        "pred_idx": 2,
+        "count": 35,
+        "true_class": "Tee",
+        "pred_class": "Blouse",
+        "true_class_zh": "T恤",
+        "pred_class_zh": "女式衬衫"
+      },
+      {
+        "true_idx": 17,
+        "pred_idx": 40,
+        "count": 32,
+        "true_class": "Tee",
+        "pred_class": "Dress",
+        "true_class_zh": "T恤",
+        "pred_class_zh": "连衣裙"
+      },
+      {
+        "true_idx": 17,
+        "pred_idx": 16,
+        "count": 31,
+        "true_class": "Tee",
+        "pred_class": "Tank",
+        "true_class_zh": "T恤",
+        "pred_class_zh": "背心"
+      },
+      {
+        "true_idx": 18,
+        "pred_idx": 17,
+        "count": 26,
+        "true_class": "Top",
+        "pred_class": "Tee",
+        "true_class_zh": "上衣",
+        "pred_class_zh": "T恤"
+      }
+    ]
+  },
+  "class_names": [
+    "Anorak",
+    "Blazer",
+    "Blouse",
+    "Bomber",
+    "Button-Down",
+    "Cardigan",
+    "Flannel",
+    "Halter",
+    "Henley",
+    "Hoodie",
+    "Jacket",
+    "Jersey",
+    "Parka",
+    "Peacoat",
+    "Poncho",
+    "Sweater",
+    "Tank",
+    "Tee",
+    "Top",
+    "Turtleneck",
+    "Capris",
+    "Chinos",
+    "Culottes",
+    "Cutoffs",
+    "Gauchos",
+    "Jeans",
+    "Jeggings",
+    "Jodhpurs",
+    "Joggers",
+    "Leggings",
+    "Sarong",
+    "Shorts",
+    "Skirt",
+    "Sweatpants",
+    "Sweatshorts",
+    "Trunks",
+    "Caftan",
+    "Cape",
+    "Coat",
+    "Coverup",
+    "Dress",
+    "Jumpsuit",
+    "Kaftan",
+    "Kimono",
+    "Nightdress",
+    "Onesie",
+    "Robe",
+    "Romper",
+    "Shirtdress",
+    "Sundress"
+  ],
+  "class_names_zh": [
+    "冲锋衣",
+    "西装外套",
+    "女式衬衫",
+    "飞行员夹克",
+    "纽扣衫",
+    "开衫",
+    "法兰绒衬衫",
+    "挂脖上衣",
+    "半开领衫",
+    "连帽衫",
+    "夹克",
+    "运动衫",
+    "派克大衣",
+    "双排扣大衣",
+    "斗篷",
+    "毛衣",
+    "背心",
+    "T恤",
+    "上衣",
+    "高领衫",
+    "七分裤",
+    "卡其裤",
+    "阔腿短裤",
+    "牛仔短裤",
+    "高乔裤",
+    "牛仔裤",
+    "打底裤",
+    "马裤",
+    "慢跑裤",
+    "紧身裤",
+    "纱笼",
+    "短裤",
+    "裙子",
+    "运动裤",
+    "运动短裤",
+    "泳裤",
+    "长袍",
+    "斗篷",
+    "外套",
+    "罩衫",
+    "连衣裙",
+    "连体衣",
+    "长袍",
+    "和服",
+    "睡裙",
+    "连体服",
+    "长袍",
+    "连体短裤",
+    "衬衫裙",
+    "太阳裙"
+  ],
+  "misclassified_examples": [
+    {
+      "sample_index": 3393,
+      "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\V-Cut_Back_Romper\\img_00000042.jpg",
+      "true_class": "Romper",
+      "pred_class": "Jumpsuit",
+      "true_class_zh": "连体短裤",
+      "pred_class_zh": "连体衣",
+      "pred_confidence": 0.9833
+    },
+    {
+      "sample_index": 3703,
+      "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Southwestern-Printed_Surplice_Romper\\img_00000004.jpg",
+      "true_class": "Romper",
+      "pred_class": "Jumpsuit",
+      "true_class_zh": "连体短裤",
+      "pred_class_zh": "连体衣",
+      "pred_confidence": 0.9746
+    },
+    {
+      "sample_index": 398,
+      "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Denim_Drawstring_Jumpsuit\\img_00000055.jpg",
+      "true_class": "Jumpsuit",
+      "pred_class": "Romper",
+      "true_class_zh": "连体衣",
+      "pred_class_zh": "连体短裤",
+      "pred_confidence": 0.9589
+    },
+    {
+      "sample_index": 2986,
+      "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Grumpy_Cat_Graphic_Tee\\img_00000026.jpg",
+      "true_class": "Tee",
+      "pred_class": "Tank",
+      "true_class_zh": "T恤",
+      "pred_class_zh": "背心",
+      "pred_confidence": 0.9554
+    },
+    {
+      "sample_index": 1099,
+      "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Leopard_Print_Knit_Sweatpants\\img_00000045.jpg",
+      "true_class": "Sweatpants",
+      "pred_class": "Skirt",
+      "true_class_zh": "运动裤",
+      "pred_class_zh": "裙子",
+      "pred_confidence": 0.9413
+    },
+    {
+      "sample_index": 1646,
+      "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Striped_Crew_Neck_Sweater\\img_00000068.jpg",
+      "true_class": "Sweater",
+      "pred_class": "Tee",
+      "true_class_zh": "毛衣",
+      "pred_class_zh": "T恤",
+      "pred_confidence": 0.9369
+    },
+    {
+      "sample_index": 1684,
+      "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Plaid_Skater_Skirt\\img_00000063.jpg",
+      "true_class": "Skirt",
+      "pred_class": "Shorts",
+      "true_class_zh": "裙子",
+      "pred_class_zh": "短裤",
+      "pred_confidence": 0.9353
+    },
+    {
+      "sample_index": 1763,
+      "image_path": "Category and Attribute Prediction Benchmark\\Img\\img\\Collarless_V-Neck_Blouse\\img_00000022.jpg",
+      "true_class": "Blouse",
+      "pred_class": "Jumpsuit",
+      "true_class_zh": "女式衬衫",
+      "pred_class_zh": "连体衣",
+      "pred_confidence": 0.9351
+    }
+  ],
+  "train_class_distribution_1based": {
+    "1": 9,
+    "2": 367,
+    "3": 1055,
+    "4": 16,
+    "5": 9,
+    "6": 635,
+    "7": 6,
+    "8": 1,
+    "9": 45,
+    "10": 201,
+    "11": 476,
+    "12": 40,
+    "13": 26,
+    "14": 2,
+    "15": 35,
+    "16": 557,
+    "17": 726,
+    "18": 1621,
+    "19": 534,
+    "20": 11,
+    "21": 7,
+    "22": 28,
+    "23": 34,
+    "24": 71,
+    "26": 344,
+    "27": 29,
+    "28": 3,
+    "29": 200,
+    "30": 232,
+    "31": 3,
+    "32": 822,
+    "33": 680,
+    "34": 116,
+    "35": 58,
+    "36": 17,
+    "37": 1,
+    "39": 115,
+    "40": 2,
+    "41": 4016,
+    "42": 351,
+    "43": 8,
+    "44": 143,
+    "46": 5,
+    "47": 3,
+    "48": 340
+  }
+}

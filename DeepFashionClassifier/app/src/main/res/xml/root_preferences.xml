@@ -75,26 +75,6 @@
             app:useSimpleSummaryProvider="true"
             app:iconSpaceReserved="false" />
 
-        <ListPreference
-            android:key="pref_burst_count"
-            android:title="@string/pref_burst_count"
-            android:summary="@string/pref_burst_count_summary"
-            android:entries="@array/pref_burst_count_entries"
-            android:entryValues="@array/pref_burst_count_values"
-            android:defaultValue="5"
-            app:useSimpleSummaryProvider="true"
-            app:iconSpaceReserved="false" />
-
-        <ListPreference
-            android:key="pref_burst_strategy"
-            android:title="@string/pref_burst_strategy"
-            android:summary="@string/pref_burst_strategy_summary"
-            android:entries="@array/pref_burst_strategy_entries"
-            android:entryValues="@array/pref_burst_strategy_values"
-            android:defaultValue="best"
-            app:useSimpleSummaryProvider="true"
-            app:iconSpaceReserved="false" />
-
         <SwitchPreferenceCompat
             android:key="pref_share_watermark"
             android:title="@string/pref_share_watermark"

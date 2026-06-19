@@ -25,20 +25,32 @@ object HistoryRepository {
     fun addEntry(context: Context, category: String, confidence: Float, imagePath: String?): HistoryItem? {
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         val timeStr = sdf.format(Date())
+        return appendEntry(context, timeStr, category, confidence, imagePath, isFavorite = false)
+    }
+
+    fun appendEntry(
+        context: Context,
+        time: String,
+        category: String,
+        confidence: Float,
+        imagePath: String?,
+        isFavorite: Boolean = false
+    ): HistoryItem {
         val record = JSONObject().apply {
-            put("time", timeStr)
+            put("time", time)
             put("category", category)
             put("confidence", confidence)
             if (imagePath != null) put("imagePath", imagePath)
+            put("isFavorite", isFavorite)
         }
         val file = historyFile(context)
         file.appendText(record.toString() + "\n", Charsets.UTF_8)
         return HistoryItem(
-            time = timeStr,
+            time = time,
             category = category,
             confidence = confidence,
             imagePath = imagePath,
-            isFavorite = false
+            isFavorite = isFavorite
         )
     }
 
@@ -126,6 +138,37 @@ object HistoryRepository {
 
     fun deleteEntries(context: Context, targets: List<HistoryItem>) {
         targets.forEach { deleteEntry(context, it) }
+    }
+
+    fun deleteDemoEntries(context: Context): Int {
+        val file = historyFile(context)
+        if (!file.exists()) return 0
+        var removed = 0
+        val kept = file.readLines(Charsets.UTF_8).filter { line ->
+            if (line.isBlank()) return@filter true
+            try {
+                val path = JSONObject(line).optString("imagePath", "")
+                val isDemo = path.contains("/demo_") || path.contains("\\demo_")
+                if (isDemo) {
+                    removed++
+                    try {
+                        val img = File(path)
+                        if (img.exists() && img.absolutePath.startsWith(context.filesDir.absolutePath)) {
+                            img.delete()
+                        }
+                    } catch (_: Exception) { }
+                    false
+                } else {
+                    true
+                }
+            } catch (_: Exception) {
+                true
+            }
+        }
+        if (removed > 0) {
+            file.writeText(kept.joinToString("\n"), Charsets.UTF_8)
+        }
+        return removed
     }
 
     fun exportJsonl(context: Context): String {

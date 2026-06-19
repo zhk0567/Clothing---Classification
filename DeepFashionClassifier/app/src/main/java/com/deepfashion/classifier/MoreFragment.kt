@@ -5,6 +5,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import com.deepfashion.classifier.databinding.FragmentMoreBinding
 
@@ -57,6 +59,61 @@ class MoreFragment : Fragment() {
             startActivity(Intent(ctx, SettingsActivity::class.java))
             activity?.overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
         }
+        binding.cardDemoData.setOnClickListener { showDemoDataDialog() }
+    }
+
+    private fun showDemoDataDialog() {
+        val ctx = requireContext()
+        val hasDemo = DemoDataSeeder.hasDemoData(ctx)
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.demo_data)
+            .setMessage(
+                if (hasDemo) getString(R.string.demo_data_has_data)
+                else getString(R.string.demo_data_message)
+            )
+            .setPositiveButton(R.string.demo_data_load) { _, _ ->
+                Thread {
+                    val count = DemoDataSeeder.seed(ctx, replace = false)
+                    activity?.runOnUiThread {
+                        val msg = if (count > 0) {
+                            getString(R.string.demo_data_loaded, count)
+                        } else {
+                            getString(R.string.demo_data_already)
+                        }
+                        Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+                    }
+                }.start()
+            }
+            .setNeutralButton(R.string.demo_data_replace) { _, _ ->
+                Thread {
+                    val count = DemoDataSeeder.seed(ctx, replace = true)
+                    activity?.runOnUiThread {
+                        Toast.makeText(ctx, getString(R.string.demo_data_loaded, count), Toast.LENGTH_SHORT).show()
+                    }
+                }.start()
+            }
+            .apply {
+                if (hasDemo) {
+                    setNegativeButton(R.string.demo_data_clear) { _, _ ->
+                        Thread {
+                            val removed = DemoDataSeeder.clearDemo(ctx)
+                            androidx.preference.PreferenceManager.getDefaultSharedPreferences(ctx).edit()
+                                .putBoolean("pref_demo_data_seeded", false)
+                                .apply()
+                            activity?.runOnUiThread {
+                                Toast.makeText(
+                                    ctx,
+                                    getString(R.string.demo_data_cleared, removed),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }.start()
+                    }
+                } else {
+                    setNegativeButton(android.R.string.cancel, null)
+                }
+            }
+            .show()
     }
 
     override fun onDestroyView() {

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="home_text_primary">#FFE6E1E5</color>
+    <color name="home_text_secondary">#FFCAC4D0</color>
+    <color name="home_accent">#FFD0BCFF</color>
+    <color name="home_stat_number">#FFD0BCFF</color>
+    <color name="home_surface">#FF1C1B1F</color>
+    <color name="home_gradient_start">#FF0B1220</color>
+    <color name="home_gradient_end">#FF141A2A</color>
+    <color name="history_item_selected">#33D0BCFF</color>
+</resources>

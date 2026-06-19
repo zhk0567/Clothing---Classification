@@ -21,14 +21,11 @@ import androidx.preference.PreferenceManager
 import com.deepfashion.classifier.databinding.ActivityCameraBinding
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.resume
 
 class CameraActivity : AppCompatActivity() {
     private lateinit var binding: ActivityCameraBinding
@@ -38,7 +35,6 @@ class CameraActivity : AppCompatActivity() {
     private var cameraControl: CameraControl? = null
     private var currentSelector: CameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
     private var isProcessing = false
-    private var burstMode = false
 
     private var scaleGestureDetector: ScaleGestureDetector? = null
     private var gestureDetector: GestureDetector? = null
@@ -193,17 +189,8 @@ class CameraActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        binding.toggleCaptureMode.check(R.id.btnSingleMode)
-        binding.toggleCaptureMode.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (isChecked) {
-                burstMode = checkedId == R.id.btnBurstMode
-            }
-        }
-
         binding.btnCapture.setOnClickListener {
-            if (!isProcessing) {
-                if (burstMode) startBurstCapture() else takePhoto()
-            }
+            if (!isProcessing) takePhoto()
         }
 
         binding.btnSwitchCamera.setOnClickListener { switchCamera() }
@@ -305,58 +292,6 @@ class CameraActivity : AppCompatActivity() {
         )
     }
 
-    private fun startBurstCapture() {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        val count = prefs.getString("pref_burst_count", "5")?.toIntOrNull() ?: 5
-        val strategy = prefs.getString("pref_burst_strategy", "best") ?: "best"
-        isProcessing = true
-        binding.btnCapture.isEnabled = false
-        binding.tvBurstProgress.visibility = View.VISIBLE
-
-        lifecycleScope.launch {
-            val results = mutableListOf<Triple<String, DeepFashionClassifier.ClassificationResult, android.graphics.Bitmap>>()
-            repeat(count) { index ->
-                binding.tvBurstProgress.text = getString(R.string.burst_progress, index + 1, count)
-                val path = captureOnePhotoSync()
-                if (path != null) {
-                    val bitmap = BitmapFactory.decodeFile(path)
-                    if (bitmap != null) {
-                        val result = withContext(Dispatchers.Default) {
-                            ClassifierProvider.classifyImage(this@CameraActivity, bitmap, path)
-                        }
-                        results.add(Triple(path, result, bitmap))
-                    }
-                }
-                if (index < count - 1) delay(300)
-            }
-            binding.tvBurstProgress.visibility = View.GONE
-            handleBurstResults(results, strategy)
-            resetCaptureState()
-        }
-    }
-
-    private suspend fun captureOnePhotoSync(): String? = withContext(Dispatchers.Main) {
-        val capture = imageCapture ?: return@withContext null
-        playShutterSound()
-        val photoFile = java.io.File(getExternalFilesDir(null), "burst_${System.currentTimeMillis()}.jpg")
-        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-        kotlinx.coroutines.suspendCancellableCoroutine { cont ->
-            capture.takePicture(
-                outputOptions,
-                ContextCompat.getMainExecutor(this@CameraActivity),
-                object : ImageCapture.OnImageSavedCallback {
-                    override fun onError(exception: ImageCaptureException) {
-                        if (cont.isActive) cont.resume(null)
-                    }
-
-                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        if (cont.isActive) cont.resume(copyToInternalStorage(photoFile))
-                    }
-                }
-            )
-        }
-    }
-
     private fun copyToInternalStorage(photoFile: java.io.File): String {
         return try {
             val imagesDir = java.io.File(filesDir, "images")
@@ -366,26 +301,6 @@ class CameraActivity : AppCompatActivity() {
             target.absolutePath
         } catch (_: Exception) {
             photoFile.absolutePath
-        }
-    }
-
-    private fun handleBurstResults(
-        results: List<Triple<String, DeepFashionClassifier.ClassificationResult, android.graphics.Bitmap>>,
-        strategy: String
-    ) {
-        if (results.isEmpty()) {
-            Toast.makeText(this, R.string.capture_failed, Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (strategy == "all") {
-            BatchResultStore.items = results.map { (path, result, _) ->
-                BatchResultItem(path, result.category, result.confidence, result.description)
-            }
-            startActivity(Intent(this, BatchResultActivity::class.java))
-            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
-        } else {
-            val best = results.maxByOrNull { it.second.confidence }!!
-            navigateToResult(best.second, best.first)
         }
     }
 
